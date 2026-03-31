@@ -1,0 +1,54 @@
+.confetti-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.promo-text {
+  font-size: clamp(1.5rem, 5vw, 2.5rem);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: white;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  text-align: center;
+  width: 100%; /* Make sure it takes full width to center text inside */
+}
+
+.confetti {
+  position: absolute;
+  top: -10px;
+  width: 8px;
+  height: 14px;
+  opacity: 0;
+  animation: confetti-fall 2.2s ease-out forwards;
+}
+
+@keyframes confetti-fall {
+  0% {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(110vh) rotate(720deg);
+  }
+}
+
+@media (max-width: 640px) {
+  .confetti-overlay {
+    justify-content: center;
+    align-items: center;
+  }
+
+  .promo-text {
+    width: 100%;
+    text-align: center;
+    margin: 0 auto;
+  }
+}

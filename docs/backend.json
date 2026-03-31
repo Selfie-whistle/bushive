@@ -1,0 +1,742 @@
+
+{
+  "entities": {
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Represents a registered user's profile, storing personal details and preferences for features like the AI Itinerary Planner.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the UserProfile entity."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address.",
+          "format": "email"
+        },
+        "firstName": {
+          "type": "string",
+          "description": "The user's first name."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "The user's last name."
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "The user's primary phone number for contact and booking management."
+        },
+        "preferences": {
+          "type": "array",
+          "description": "A list of strings representing user travel preferences (e.g., 'adventure', 'relaxation', 'budget-friendly').",
+          "items": {
+            "type": "string"
+          }
+        },
+        "budgetRange": {
+          "type": "string",
+          "description": "User's preferred budget range for travel, e.g., 'low', 'medium', 'high'."
+        },
+        "lastLogin": {
+          "type": "string",
+          "description": "Timestamp of the user's last login.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "firstName",
+        "lastName",
+        "phoneNumber"
+      ]
+    },
+    "Bus": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Bus",
+      "type": "object",
+      "description": "Represents a physical bus vehicle operated by a travel company.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Bus entity."
+        },
+        "busNumber": {
+          "type": "string",
+          "description": "The registration number or identifier of the bus (e.g., vehicle plate number)."
+        },
+        "operatorName": {
+          "type": "string",
+          "description": "The name of the bus operating company."
+        },
+        "busType": {
+          "type": "string",
+          "description": "The type of bus (e.g., 'AC Sleeper', 'Non-AC Seater', 'Volvo Multi-Axle')."
+        },
+        "totalSeats": {
+          "type": "number",
+          "description": "The total number of seats available on the bus."
+        },
+        "amenities": {
+          "type": "array",
+          "description": "List of amenities available on the bus (e.g., 'WiFi', 'Charging Point', 'Water Bottle').",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "busNumber",
+        "operatorName",
+        "busType",
+        "totalSeats"
+      ]
+    },
+    "Route": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Route",
+      "type": "object",
+      "description": "Defines a bus route between an origin and a destination city.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Route entity."
+        },
+        "originCity": {
+          "type": "string",
+          "description": "The starting city of the route."
+        },
+        "destinationCity": {
+          "type": "string",
+          "description": "The final destination city of the route."
+        },
+        "distanceKm": {
+          "type": "number",
+          "description": "The approximate distance of the route in kilometers."
+        },
+        "durationHours": {
+          "type": "number",
+          "description": "The approximate duration of the journey in hours."
+        },
+        "intermediateStopIds": {
+          "type": "array",
+          "description": "References to Stop entities that are intermediate stops along this route. (Relationship: Stop N:N Route)",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "originCity",
+        "destinationCity",
+        "distanceKm",
+        "durationHours"
+      ]
+    },
+    "Stop": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Stop",
+      "type": "object",
+      "description": "Represents a geographical location where a bus can stop, either as an intermediate point or a major boarding/dropping point.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Stop entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The common name of the stop (e.g., 'MG Road', 'Bus Stand')."
+        },
+        "city": {
+          "type": "string",
+          "description": "The city where the stop is located."
+        },
+        "address": {
+          "type": "string",
+          "description": "The full address of the stop."
+        },
+        "latitude": {
+          "type": "number",
+          "description": "The geographical latitude of the stop."
+        },
+        "longitude": {
+          "type": "number",
+          "description": "The geographical longitude of the stop."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "city",
+        "address",
+        "latitude",
+        "longitude"
+      ]
+    },
+    "BusSchedule": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "BusSchedule",
+      "type": "object",
+      "description": "Represents a specific instance of a bus journey on a particular date and time for a given route.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the BusSchedule entity."
+        },
+        "busId": {
+          "type": "string",
+          "description": "Reference to the Bus entity operating this schedule. (Relationship: Bus 1:N BusSchedule)"
+        },
+        "routeId": {
+          "type": "string",
+          "description": "Reference to the Route entity for this schedule. (Relationship: Route 1:N BusSchedule)"
+        },
+        "departureDateTime": {
+          "type": "string",
+          "description": "The scheduled departure date and time of the bus for this journey (in Indian timezone context).",
+          "format": "date-time"
+        },
+        "arrivalDateTime": {
+          "type": "string",
+          "description": "The scheduled arrival date and time of the bus for this journey (in Indian timezone context).",
+          "format": "date-time"
+        },
+        "basePrice": {
+          "type": "number",
+          "description": "The base price per seat for this schedule."
+        },
+        "availableSeatsCount": {
+          "type": "number",
+          "description": "The number of currently available seats for this schedule."
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the bus schedule (e.g., 'scheduled', 'departed', 'completed', 'cancelled')."
+        },
+        "boardingPoints": {
+          "type": "array",
+          "description": "A list of boarding points and their scheduled times for this journey.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "droppingPoints": {
+          "type": "array",
+          "description": "A list of dropping points and their scheduled times for this journey.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "busId",
+        "routeId",
+        "departureDateTime",
+        "arrivalDateTime",
+        "basePrice",
+        "status",
+        "boardingPoints",
+        "droppingPoints"
+      ]
+    },
+    "Seat": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Seat",
+      "type": "object",
+      "description": "Represents a specific seat's state and details for a particular bus schedule.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Seat entity (e.g., combining BusSchedule ID and seat number)."
+        },
+        "busScheduleId": {
+          "type": "string",
+          "description": "Reference to the BusSchedule entity this seat belongs to. (Relationship: BusSchedule 1:N Seat)"
+        },
+        "seatNumber": {
+          "type": "string",
+          "description": "The unique number or identifier of the seat on the bus (e.g., 'A1', '12')."
+        },
+        "deck": {
+          "type": "string",
+          "description": "The deck where the seat is located (e.g., 'Lower', 'Upper' for multi-deck buses)."
+        },
+        "type": {
+          "type": "string",
+          "description": "The type of seat (e.g., 'Window', 'Aisle', 'Sleeper Berth', 'Seater')."
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the seat ('available', 'booked', 'held', 'reserved_female', 'reserved_male')."
+        },
+        "rate": {
+          "type": "number",
+          "description": "The fare for this specific seat."
+        },
+        "genderPreference": {
+          "type": "string",
+          "description": "Indicates if the seat has a specific gender preference or restriction ('male', 'female', 'any')."
+        },
+        "bookingId": {
+          "type": "string",
+          "description": "Reference to the Booking entity if this seat is booked. (Relationship: Booking 1:N Seat)"
+        },
+        "passengerId": {
+          "type": "string",
+          "description": "Reference to the Passenger entity occupying this seat. Used for showing neighboring passenger gender. (Relationship: Passenger 1:1 Seat)"
+        }
+      },
+      "required": [
+        "id",
+        "busScheduleId",
+        "seatNumber",
+        "deck",
+        "type",
+        "status",
+        "rate",
+        "genderPreference"
+      ]
+    },
+    "Passenger": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Passenger",
+      "type": "object",
+      "description": "Represents details of an individual passenger traveling on a booking.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Passenger entity."
+        },
+        "firstName": {
+          "type": "string",
+          "description": "The passenger's first name."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "The user's last name."
+        },
+        "gender": {
+          "type": "string",
+          "description": "The passenger's gender ('male', 'female', 'other')."
+        },
+        "age": {
+          "type": "number",
+          "description": "The passenger's age."
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "The passenger's phone number (optional, often linked to a primary passenger)."
+        },
+        "email": {
+          "type": "string",
+          "description": "The passenger's email address (optional).",
+          "format": "email"
+        }
+      },
+      "required": [
+        "id",
+        "firstName",
+        "lastName",
+        "gender",
+        "age"
+      ]
+    },
+    "Booking": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Booking",
+      "type": "object",
+      "description": "Represents a user's bus ticket reservation, including chosen seats, passenger details, and payment information.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Booking entity."
+        },
+        "bookingReference": {
+          "type": "string",
+          "description": "A unique, user-friendly reference code for the booking."
+        },
+        "busScheduleId": {
+          "type": "string",
+          "description": "Reference to the BusSchedule entity for this booking. (Relationship: BusSchedule 1:N Booking)"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the UserProfile entity if the booking was made by a registered user. (Relationship: UserProfile 1:N Booking)"
+        },
+        "primaryPassengerId": {
+          "type": "string",
+          "description": "Reference to the main Passenger entity responsible for this booking. (Relationship: Passenger 1:N Booking)"
+        },
+        "contactPhoneNumber": {
+          "type": "string",
+          "description": "The phone number used for booking lookup and contact."
+        },
+        "contactEmail": {
+          "type": "string",
+          "description": "The email address used for booking confirmation and contact.",
+          "format": "email"
+        },
+        "seatIds": {
+          "type": "array",
+          "description": "References to Seat entities included in this booking. (Relationship: Seat N:N Booking)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "passengerIds": {
+          "type": "array",
+          "description": "References to Passenger entities associated with this booking. (Relationship: Passenger N:N Booking)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "totalAmount": {
+          "type": "number",
+          "description": "The total monetary amount paid for this booking."
+        },
+        "paymentStatus": {
+          "type": "string",
+          "description": "The status of the payment for this booking ('pending', 'paid', 'failed', 'refunded')."
+        },
+        "bookingStatus": {
+          "type": "string",
+          "description": "The overall status of the booking ('confirmed', 'cancelled', 'modified')."
+        },
+        "bookingDateTime": {
+          "type": "string",
+          "description": "The date and time when the booking was made.",
+          "format": "date-time"
+        },
+        "boardingPointName": {
+          "type": "string",
+          "description": "The name of the chosen boarding point for this booking (e.g., 'Majestic Bus Stand')."
+        },
+        "droppingPointName": {
+          "type": "string",
+          "description": "The name of the chosen dropping point for this booking (e.g., 'Shivaji Nagar')."
+        }
+      },
+      "required": [
+        "id",
+        "bookingReference",
+        "busScheduleId",
+        "primaryPassengerId",
+        "contactPhoneNumber",
+        "contactEmail",
+        "seatIds",
+        "passengerIds",
+        "totalAmount",
+        "paymentStatus",
+        "bookingStatus",
+        "bookingDateTime",
+        "boardingPointName",
+        "droppingPointName"
+      ]
+    },
+    "Itinerary": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Itinerary",
+      "type": "object",
+      "description": "Represents a personalized travel itinerary generated by the AI planner based on user preferences and history.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Itinerary entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the UserProfile entity for whom this itinerary was generated. (Relationship: UserProfile 1:N Itinerary)"
+        },
+        "title": {
+          "type": "string",
+          "description": "A descriptive title for the itinerary (e.g., 'Goa Beach Holiday')."
+        },
+        "description": {
+          "type": "string",
+          "description": "A detailed description of the itinerary."
+        },
+        "generatedByAI": {
+          "type": "boolean",
+          "description": "Indicates if the itinerary was generated by an AI (true) or manually created (false)."
+        },
+        "preferencesUsed": {
+          "type": "array",
+          "description": "A snapshot of user preferences used for generating this itinerary.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "budget": {
+          "type": "string",
+          "description": "The budget category considered for this itinerary (e.g., 'low', 'medium', 'high')."
+        },
+        "durationDays": {
+          "type": "number",
+          "description": "The planned duration of the itinerary in days."
+        },
+        "activities": {
+          "type": "array",
+          "description": "A list of suggested activities or points of interest for the itinerary.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "suggestedBookingIds": {
+          "type": "array",
+          "description": "References to BusSchedule IDs or other relevant booking IDs suggested in this itinerary. (Relationship: BusSchedule N:N Itinerary)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "generationDateTime": {
+          "type": "string",
+          "description": "The date and time when this itinerary was generated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "title",
+        "description",
+        "generatedByAI",
+        "preferencesUsed",
+        "budget",
+        "durationDays",
+        "activities",
+        "generationDateTime"
+      ]
+    },
+    "Notification": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Notification",
+      "type": "object",
+      "description": "A notification sent to a user regarding their bookings, account, or promotions.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the notification."
+        },
+        "userId": {
+          "type": "string",
+          "description": "The user ID receiving the notification."
+        },
+        "title": {
+          "type": "string",
+          "description": "Summary of the alert."
+        },
+        "message": {
+          "type": "string",
+          "description": "Detailed notification content."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["info", "alert", "trip"],
+          "description": "The nature of the notification."
+        },
+        "read": {
+          "type": "boolean",
+          "description": "Whether the user has seen the alert."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the alert was issued."
+        }
+      },
+      "required": ["id", "userId", "title", "message", "type", "read", "createdAt"]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "UserProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Stores personal details and preferences for a registered user. Access is private to the user, directly tied to `request.auth.uid` via the path parameter.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique ID of the authenticated user, matching `request.auth.uid`."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/itineraries/{itineraryId}",
+        "definition": {
+          "entityName": "Itinerary",
+          "schema": {
+            "$ref": "#/backend/entities/Itinerary"
+          },
+          "description": "Personalized travel itineraries generated by the AI planner, owned by the user. Access is private to the user, directly tied to `request.auth.uid` via the path parameter.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique ID of the authenticated user, matching `request.auth.uid`."
+            },
+            {
+              "name": "itineraryId",
+              "description": "The unique identifier for the specific itinerary."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/notifications/{notificationId}",
+        "definition": {
+          "entityName": "Notification",
+          "schema": {
+            "$ref": "#/backend/entities/Notification"
+          },
+          "description": "User-specific notifications.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique ID of the user."
+            },
+            {
+              "name": "notificationId",
+              "description": "The unique ID of the notification."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/buses/{busId}",
+        "definition": {
+          "entityName": "Bus",
+          "schema": {
+            "$ref": "#/backend/entities/Bus"
+          },
+          "description": "Details about a physical bus vehicle. This data is read-only for all authenticated users and mutable by administrators.",
+          "params": [
+            {
+              "name": "busId",
+              "description": "The unique identifier for the bus."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/routes/{routeId}",
+        "definition": {
+          "entityName": "Route",
+          "schema": {
+            "$ref": "#/backend/entities/Route"
+          },
+          "description": "Defines bus routes between an origin and a destination city. This data is read-only for all authenticated users and mutable by administrators.",
+          "params": [
+            {
+              "name": "routeId",
+              "description": "The unique identifier for the route."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/stops/{stopId}",
+        "definition": {
+          "entityName": "Stop",
+          "schema": {
+            "$ref": "#/backend/entities/Stop"
+          },
+          "description": "Represents a geographical location where a bus can stop. This data is read-only for all authenticated users.",
+          "params": [
+            {
+              "name": "stopId",
+              "description": "The unique identifier for the stop."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/busSchedules/{busScheduleId}",
+        "definition": {
+          "entityName": "BusSchedule",
+          "schema": {
+            "$ref": "#/backend/entities/BusSchedule"
+          },
+          "description": "Represents a specific instance of a bus journey. This data is read-only for all authenticated users for search and viewing.",
+          "params": [
+            {
+              "name": "busScheduleId",
+              "description": "The unique identifier for the bus schedule."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/busSchedules/{busScheduleId}/seats/{seatId}",
+        "definition": {
+          "entityName": "Seat",
+          "schema": {
+            "$ref": "#/backend/entities/Seat"
+          },
+          "description": "Represents a specific seat's state and details for a particular bus schedule. Includes denormalized 'bookedPassengerGender' for authorization independence and efficient seat map rendering. All documents are publicly readable for displaying seat availability and status.",
+          "params": [
+            {
+              "name": "busScheduleId",
+              "description": "The unique identifier of the parent bus schedule."
+            },
+            {
+              "name": "seatId",
+              "description": "The unique identifier for the seat within the schedule."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/bookings/{bookingId}",
+        "definition": {
+          "entityName": "Booking",
+          "schema": {
+            "$ref": "#/backend/entities/Booking"
+          },
+          "description": "Represents a user's bus ticket reservation. Contains 'userId' for authenticated user ownership and 'contactPhoneNumber' for unauthenticated booking lookup and management.",
+          "params": [
+            {
+              "name": "bookingId",
+              "description": "The unique identifier for the booking."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/bookings/{bookingId}/passengers/{passengerId}",
+        "definition": {
+          "entityName": "Passenger",
+          "schema": {
+            "$ref": "#/backend/entities/Passenger"
+          },
+          "description": "Details of an individual passenger traveling on a specific booking. Access is restricted to the owner of the parent booking.",
+          "params": [
+            {
+              "name": "bookingId",
+              "description": "The unique identifier of the parent booking."
+            },
+            {
+              "name": "passengerId",
+              "description": "The unique identifier for the passenger within the booking."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed following the core principles of Authorization Independence, Structural Segregation, and Access Modeling, ensuring a secure, scalable, and debuggable database. User-specific data, such as `UserProfile` and `Itinerary`, is strictly segregated under `/users/{userId}/...` paths. This path-based ownership makes authorization rules extremely simple and efficient, as a `request.auth.uid` check directly against the `{userId}` wildcard ensures a user can only access their own data. The `Booking` collection is made top-level (`/bookings/{bookingId}`) to facilitate easy lookup by `contactPhoneNumber` for booking management (a core requirement), while still retaining a `userId` field for authenticated user ownership. This allows for clear authorization rules: authenticated users can access their bookings via `resource.data.userId == request.auth.uid`, and unauthenticated users can perform restricted lookups using `contactPhoneNumber` and `bookingReference`.\n\nCrucially, **Authorization Independence** is achieved for `Seat` data through significant denormalization. Each `Seat` document (`/busSchedules/{busScheduleId}/seats/{seatId}`) will include all necessary information for display, such as `status`, `rate`, `genderPreference`, and a denormalized `bookedPassengerGender` field (if the seat is booked). This means that security rules evaluating access to a `Seat` document do not need to perform `get()` operations on parent `BusSchedule` or related `Passenger` or `Booking` documents to determine read access or rendering information. This design prevents cascading rule dependencies and enables atomic operations for seat selection (handled securely via Cloud Functions).\n\n**QAPs (Rules are not Filters)** are supported across the design:\n*   **Public Reference Data:** Collections like `/buses`, `/routes`, `/stops`, and `/busSchedules` are designed to be publicly readable by all authenticated users. This homogeneous security posture allows for efficient `list` operations without requiring Firestore rules to act as data filters (e.g., users can list all available bus schedules for a given route without needing per-document authorization checks).\n*   **User-Owned Data:** For `/users/{userId}/userProfile` and `/users/{userId}/itineraries`, `list` operations are naturally restricted by the path, allowing users to query *only* their own data efficiently.\n*   **Seat Selection:** Users can `list` all seats for a specific `busScheduleId` (`/busSchedules/{busScheduleId}/seats`). Since `Seat` documents contain all necessary display information (including denormalized gender for neighboring passengers), no further server-side filtering or `get()` calls are required within security rules for displaying the interactive seat map.\n*   **Booking Management:** Authenticated users can `list` their own bookings by querying `/bookings` where `userId == request.auth.uid`. Unauthenticated users can `list` a specific booking by querying `/bookings` with `contactPhoneNumber` and `bookingReference`, with rules enforcing that only the specific booking matching these criteria is returned, thus preventing broad, unfiltered reads."
+  }
+}

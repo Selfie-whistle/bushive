@@ -1,0 +1,13 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    /**
+     * TEMPORARY PERMISSIVE RULES
+     * These rules allow anyone with your project ID to read and write to your database.
+     * Use this only for initial prototyping and development.
+     */
+    match /{allPaths=**} {
+      allow read, write: if true;
+    }
+  }
+}

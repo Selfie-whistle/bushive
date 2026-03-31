@@ -1,0 +1,10 @@
+{
+  "placeholderImages": [
+    {
+      "id": "hero-bus",
+      "description": "A modern bus on the road.",
+      "imageUrl": "https://s3-ap-southeast-1.amazonaws.com/rb-plus/BI/APP/IND/WM/33413/1087/GW/ML/wHRdUL.jpeg",
+      "imageHint": "bus highway"
+    }
+  ]
+}
