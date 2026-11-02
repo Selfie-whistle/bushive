@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { z } from 'zod';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   ArrowRight,
@@ -48,11 +48,13 @@ import {
 } from '@/components/ui/form';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
+import { dataService } from '@/lib/data/client-service';
 import { useFirebase } from '@/firebase';
 import { signInAnonymously } from 'firebase/auth';
 import { IndianSleeper36Layout } from '@/components/ui/indian-sleeper-36-layout';
-import { dataService } from '@/lib/data/client-service';
+import { PremiumStatus } from '@/components/premium-status';
 import Loading from './loading';
+
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn, isValidDate, formatTime } from '@/lib/utils';
@@ -63,12 +65,12 @@ import { BusImageGallery } from '@/components/bus-image-gallery';
 
 const passengerSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters' }),
-  age: z.coerce
-    .number()
-    .min(1, { message: 'Age must be at least 1' })
+  age: z.number({ 
+    message: "Age must be a number",
+  }).min(1, { message: 'Age must be at least 1' })
     .max(120, { message: 'Age must be less than 120' }),
   gender: z.enum(['male', 'female', 'other'], {
-    required_error: 'Gender is required',
+    message: 'Gender is required',
   }),
   price: z.number(),
   seatNumber: z.string(),
@@ -79,7 +81,7 @@ const bookingSchema = z.object({
     .array(passengerSchema)
     .min(1, { message: 'At least one passenger is required.' }),
   contact: z.object({
-    email: z.union([z.string().email(), z.literal('')]).optional(),
+    email: z.string().email().optional().or(z.literal('')),
     phone: z.string().min(10, { message: 'Phone number must be at least 10 digits' }),
   }),
   boardingPoint: z.string().min(1, { message: 'Boarding point is required' }),
@@ -243,7 +245,12 @@ export function BookPageClient({
 
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingSchema),
-    defaultValues: { passengers: [], contact: { email: '', phone: '' } },
+    defaultValues: { 
+      passengers: [], 
+      contact: { email: '', phone: '' },
+      boardingPoint: '',
+      droppingPoint: ''
+    },
   });
 
   const { fields, replace } = useFieldArray({
@@ -364,7 +371,7 @@ export function BookPageClient({
         replace([{
           name: '',
           age: 0,
-          gender: 'male',
+          gender: 'male' as const,
           price: lastSeat.price,
           seatNumber: lastSeat.number
         }]);
@@ -375,12 +382,12 @@ export function BookPageClient({
     
     // Sync form fields while trying to preserve existing passenger data by seat number
     const currentPassengers = form.getValues('passengers') || [];
-    const newPassengers = seats.map((seat) => {
+    const newPassengers: BookingFormValues['passengers'] = seats.map((seat) => {
         const existing = currentPassengers.find(p => p.seatNumber === seat.number);
         return existing || {
             name: '',
             age: 0,
-            gender: 'male',
+            gender: 'male' as const,
             price: seat.price,
             seatNumber: seat.number,
         };
@@ -393,7 +400,7 @@ export function BookPageClient({
     return selectedSeats.reduce((t, s) => t + s.price, 0);
   }, [selectedSeats]);
 
-  const onSubmit = async (data: BookingFormValues) => {
+  const onSubmit: SubmitHandler<BookingFormValues> = async (data) => {
     if (!bus || !schedule) return;
     if (!user && auth) await signInAnonymously(auth);
   
@@ -451,7 +458,12 @@ export function BookPageClient({
         </h1>
       </div>
 
+      <div className="container mx-auto px-4 mb-8">
+        {user && <PremiumStatus userId={user.uid} />}
+      </div>
+
       {/* MAIN CONTENT */}
+
       <div className="container mx-auto px-4 space-y-8">
         <Form {...form}>
           <form id="bookingForm" onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
@@ -665,7 +677,12 @@ export function BookPageClient({
                             <FormItem>
                               <FormLabel>Age</FormLabel>
                               <FormControl>
-                                <Input type="number" placeholder="Enter age" {...field} />
+                                <Input 
+                                  type="number" 
+                                  placeholder="Enter age" 
+                                  value={field.value || ''} 
+                                  onChange={(e) => field.onChange(e.target.value === '' ? 0 : parseInt(e.target.value, 10))} 
+                                />
                               </FormControl>
                               <FormMessage />
                             </FormItem>

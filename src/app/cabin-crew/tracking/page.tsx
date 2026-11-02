@@ -170,12 +170,8 @@ export default function TrackingControlPage() {
   }, [service, activeSchedule, logicalBus]);
   
   const nextDroppingPoint = useMemo(() => {
-    if (!logicalBus || !liveLocation || !activeSchedule || !service) {
+    if (!logicalBus || !activeSchedule || !service) {
       return null;
-    }
-
-    if (detailedBookings.length === 0) {
-      return finalDestinationPoint;
     }
 
     const allDroppingPoints =
@@ -184,18 +180,48 @@ export default function TrackingControlPage() {
         : service.droppingPointsForward;
 
     if (!allDroppingPoints || allDroppingPoints.length === 0) {
-      return null;
+      return finalDestinationPoint;
     }
 
-    const bookedDroppingPointNames = new Set(detailedBookings.map((b) => b.droppingPoint));
-    const closestStopIndex = findBestMatchIndex(allDroppingPoints, undefined, liveLocation);
+    // Find all booking entries of passengers who are boarded and not yet deboarded
+    const boardedBookingEntries = (activeSchedule.bookings || []).filter(
+      (b: any) => b.boarded && !b.deboarded
+    );
 
-    if (closestStopIndex === -1) return null;
+    if (boardedBookingEntries.length === 0) {
+      return finalDestinationPoint;
+    }
 
-    for (let i = closestStopIndex; i < allDroppingPoints.length; i++) {
+    const boardedBookingIds = new Set(boardedBookingEntries.map((b: any) => b.bookingId));
+
+    const normalize = (s?: string) => s?.trim().toLowerCase();
+    const boardedDroppingNames = new Set<string>();
+
+    detailedBookings
+      .filter((b) => boardedBookingIds.has(b.id))
+      .forEach((b) => {
+        if (b.droppingPoint) boardedDroppingNames.add(normalize(b.droppingPoint)!);
+        if (b.droppingMain) boardedDroppingNames.add(normalize(b.droppingMain)!);
+      });
+
+    boardedBookingEntries.forEach((b: any) => {
+      if (b.droppingPoint) boardedDroppingNames.add(normalize(b.droppingPoint)!);
+      if (b.droppingMain) boardedDroppingNames.add(normalize(b.droppingMain)!);
+    });
+
+    const closestStopIndex = liveLocation 
+      ? findBestMatchIndex(allDroppingPoints, undefined, liveLocation)
+      : 0;
+
+    const searchStartIndex = closestStopIndex === -1 ? 0 : closestStopIndex;
+
+    for (let i = searchStartIndex; i < allDroppingPoints.length; i++) {
       const stop = allDroppingPoints[i];
-      if (stop && bookedDroppingPointNames.has(stop.name)) {
-        return stop;
+      if (stop && stop.name) {
+        const stopNameNorm = normalize(stop.name);
+        if (stopNameNorm && boardedDroppingNames.has(stopNameNorm)) {
+          return stop;
+        }
       }
     }
 
@@ -225,10 +251,41 @@ export default function TrackingControlPage() {
         return;
     }
     try {
-        TrackingManager.start(physicalBus.id);
+        TrackingManager.start(physicalBus.id, logicalBus?.id);
         toast({ title: 'Tracking started successfully' });
     } catch (e: any) {
         toast({ title: 'Error Starting Tracking', description: e.message, variant: 'destructive' });
+    }
+  };
+
+  const startMockTracking = () => {
+    if (!physicalBus || !activeSchedule || !service || !logicalBus) {
+        toast({ title: 'Tracking Error', description: 'Missing bus or route info.', variant: 'destructive' });
+        return;
+    }
+    try {
+        const isReturn = activeSchedule.direction === 'RETURN';
+        const allBoardingPoints = isReturn ? service.boardingPointsReturn || [] : service.boardingPointsForward || [];
+        const allDroppingPoints = isReturn ? service.droppingPointsReturn || [] : service.droppingPointsForward || [];
+        
+        const fullRoutePoints = [...allBoardingPoints, ...allDroppingPoints]
+            .filter(p => p && typeof p.lat === 'number' && typeof p.lng === 'number' && !isNaN(p.lat) && !isNaN(p.lng))
+            .sort((a, b) => {
+                const dateA = getScheduledDateTime(activeSchedule.date, a.time, logicalBus?.departureTime);
+                const dateB = getScheduledDateTime(activeSchedule.date, b.time, logicalBus?.departureTime);
+                return (dateA?.getTime() || 0) - (dateB?.getTime() || 0);
+            })
+            .map(p => ({ lat: p.lat, lng: p.lng }));
+
+        if (fullRoutePoints.length < 2) {
+            toast({ title: 'Tracking Error', description: 'Not enough points for mock route.', variant: 'destructive' });
+            return;
+        }
+
+        TrackingManager.startMock(physicalBus.id, fullRoutePoints);
+        toast({ title: 'Mock Tracking started successfully' });
+    } catch (e: any) {
+        toast({ title: 'Error Starting Mock Tracking', description: e.message, variant: 'destructive' });
     }
   };
 
@@ -314,12 +371,21 @@ export default function TrackingControlPage() {
                   : 'No active route'}
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <Button disabled={trackingStatus.isActive || !logicalBus || !activeSchedule} className="bg-green-600 hover:bg-green-700" onClick={startTracking}>
-                <Play className="mr-2 h-4 w-4" /> Start
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Button 
+                disabled={trackingStatus.isActive || !logicalBus || !activeSchedule} 
+                className="bg-green-600 hover:bg-green-700 text-white font-bold h-12 rounded-xl shadow-md text-base transition-all" 
+                onClick={startTracking}
+              >
+                <Play className="mr-2 h-5 w-5 fill-white" /> Start Tracking
               </Button>
-              <Button disabled={!trackingStatus.isActive} variant="destructive" onClick={stopTracking}>
-                <StopCircle className="mr-2 h-4 w-4" /> Stop
+              <Button 
+                disabled={!trackingStatus.isActive} 
+                variant="destructive" 
+                className="font-bold h-12 rounded-xl shadow-md text-base transition-all" 
+                onClick={stopTracking}
+              >
+                <StopCircle className="mr-2 h-5 w-5" /> Stop Tracking
               </Button>
             </div>
           </CardContent>
@@ -330,9 +396,9 @@ export default function TrackingControlPage() {
              {mapRouteData && activeSchedule && (
                 <LiveTrackingMap 
                   liveLocation={liveLocation}
-                  mapRouteData={mapRouteData}
                   activeSchedule={activeSchedule}
-                  destinationPoint={nextDroppingPoint || finalDestinationPoint}
+                  mapRouteData={mapRouteData}
+                  destinationPoint={finalDestinationPoint}
                 />
              )}
           </div>
@@ -411,9 +477,10 @@ export default function TrackingControlPage() {
         )}
       </div>
       
-      <div className="hidden">
+      <div className="absolute w-0 h-0 overflow-hidden pointer-events-none opacity-0">
           {logicalBus && activeSchedule && nextDroppingPoint && liveLocation && (
               <RouteEtaCalculator
+                  key={`crew-next-stop-${nextDroppingPoint.name}`}
                   busId={logicalBus.id}
                   startPoint={liveLocation}
                   destinationPoint={nextDroppingPoint}
@@ -421,10 +488,13 @@ export default function TrackingControlPage() {
                   bookingDate={activeSchedule.date}
                   scheduledTime={nextDroppingPoint.time}
                   departureTime={logicalBus.departureTime}
+                  mapRouteData={mapRouteData}
+                  activeSchedule={activeSchedule}
               />
           )}
           {logicalBus && activeSchedule && finalDestinationPoint && liveLocation && (
               <RouteEtaCalculator
+                  key={`crew-final-dest-${finalDestinationPoint.name}`}
                   busId={logicalBus.id}
                   startPoint={liveLocation}
                   destinationPoint={finalDestinationPoint}
@@ -432,6 +502,8 @@ export default function TrackingControlPage() {
                   bookingDate={activeSchedule.date}
                   scheduledTime={finalDestinationPoint.time}
                   departureTime={logicalBus.departureTime}
+                  mapRouteData={mapRouteData}
+                  activeSchedule={activeSchedule}
               />
           )}
       </div>

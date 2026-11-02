@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, use, useCallback, useRef } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
-import { BellRing, ChevronLeft, Clock, AlertCircle } from 'lucide-react';
+import { BellRing, ChevronLeft, Clock, AlertCircle, Check, Bell } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -56,6 +56,7 @@ function SetAlarmPageContent({ id }: { id: string }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const soundInitialized = useRef(false);
   const alarmTriggeredRef = useRef(false);
+  const [isArrivalModalOpen, setIsArrivalModalOpen] = useState(false);
   
   const { liveLocation } = useLiveBusData(bus?.id || null);
   
@@ -116,11 +117,15 @@ function SetAlarmPageContent({ id }: { id: string }) {
 
   const fullDroppingPoint: Point | undefined = useMemo(() => {
     if (!bus) return undefined;
-    const allPoints = [...(bus.boardingPointsForward || []), ...(bus.droppingPointsForward || [])];
+    const isReturn = schedule?.direction === 'RETURN';
+    const allPoints = isReturn
+      ? [...(bus.boardingPointsReturn || []), ...(bus.droppingPointsReturn || [])]
+      : [...(bus.boardingPointsForward || []), ...(bus.droppingPointsForward || [])];
 
     if (fromCrew) {
         // For crew, the "dropping point" is the final destination of the bus
-        return bus.droppingPointsForward?.[bus.droppingPointsForward.length - 1];
+        const droppingPoints = isReturn ? bus.droppingPointsReturn : bus.droppingPointsForward;
+        return droppingPoints?.[droppingPoints.length - 1];
     }
     
     if (booking) {
@@ -128,7 +133,7 @@ function SetAlarmPageContent({ id }: { id: string }) {
     }
 
     return undefined;
-  }, [booking, bus, fromCrew]);
+  }, [booking, bus, fromCrew, schedule]);
 
   useEffect(() => {
     if (!id) return;
@@ -238,6 +243,14 @@ function SetAlarmPageContent({ id }: { id: string }) {
     return 'text-red-600';
   };
   
+  const handleDismissAlarmModal = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    setIsArrivalModalOpen(false);
+  };
+
   useEffect(() => {
     if (
       !alarmTriggeredRef.current &&
@@ -247,14 +260,10 @@ function SetAlarmPageContent({ id }: { id: string }) {
       routeInfo.durationMinutes <= totalMinutes
     ) {
       audioRef.current?.play().catch(e => console.error("Audio play failed:", e));
-      toast({
-        title: "Approaching Your Stop!",
-        description: `Arriving at ${fullDroppingPoint?.name} in approximately ${totalMinutes} minutes.`,
-        duration: 10000,
-      });
+      setIsArrivalModalOpen(true);
       alarmTriggeredRef.current = true;
     }
-  }, [routeInfo, isAlarmOn, toast, fullDroppingPoint, totalMinutes]);
+  }, [routeInfo, isAlarmOn, fullDroppingPoint, totalMinutes]);
 
   if (isLoading || isUserLoading) {
     return (
@@ -389,7 +398,7 @@ function SetAlarmPageContent({ id }: { id: string }) {
           </Button>
         </CardFooter>
       </Card>
-      <div className="hidden">
+      <div className="absolute w-0 h-0 overflow-hidden pointer-events-none opacity-0">
         {bus && schedule && fullDroppingPoint && liveLocation && fullDroppingPoint.time && bus.departureTime && (
           <RouteEtaCalculator
             busId={bus.id}
@@ -402,6 +411,80 @@ function SetAlarmPageContent({ id }: { id: string }) {
           />
         )}
       </div>
+      {/* High Priority Dropping Point Arrival Modal */}
+      {isArrivalModalOpen && (
+        <div 
+          className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200"
+          onClick={handleDismissAlarmModal}
+        >
+          <div 
+            className="relative w-full max-w-lg bg-white dark:bg-zinc-950 rounded-3xl shadow-2xl border-4 border-emerald-500 overflow-hidden text-gray-900 dark:text-zinc-100 animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 p-6 text-white flex items-center justify-between shadow-md">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-white shadow-inner animate-bounce">
+                  <Bell className="w-7 h-7 text-white" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase tracking-wider font-extrabold bg-white/25 px-2.5 py-0.5 rounded-full animate-pulse">
+                      High Priority Notice
+                    </span>
+                    <span className="text-xs text-emerald-100 font-bold">
+                      Approaching Stop
+                    </span>
+                  </div>
+                  <h2 className="text-2xl font-headline font-black tracking-tight text-white mt-1">
+                    {fullDroppingPoint?.name || 'Your Drop-off Stop'}
+                  </h2>
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4">
+              <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
+                <p className="font-headline font-black text-xl text-emerald-950 dark:text-emerald-100 leading-snug">
+                  Arriving at {fullDroppingPoint?.name} in approximately {totalMinutes} minutes!
+                </p>
+                <p className="text-sm text-emerald-800 dark:text-emerald-200 font-semibold mt-1.5">
+                  Please gather your luggage and personal belongings to prepare for deboarding.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 flex items-center justify-between">
+                <div>
+                  <span className="text-xs text-gray-500 font-semibold block">Scheduled Drop-off Point</span>
+                  <span className="font-black text-lg text-gray-900 dark:text-white">
+                    {fullDroppingPoint?.name}
+                  </span>
+                </div>
+                <div className="bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 px-3 py-1.5 rounded-xl font-bold text-xs">
+                  {routeInfo?.duration || `${totalMinutes} min`} away
+                </div>
+              </div>
+
+              <p className="text-xs text-gray-500 font-medium">
+                Tap the button below to turn off the alarm sound and acknowledge your upcoming arrival.
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className="p-5 bg-gray-50 dark:bg-zinc-900/60 border-t border-gray-100 dark:border-zinc-800">
+              <Button
+                size="lg"
+                onClick={handleDismissAlarmModal}
+                className="w-full bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:opacity-95 text-white font-headline font-black rounded-2xl h-14 text-base shadow-lg shadow-emerald-600/25 transition-all"
+              >
+                <Check className="w-5 h-5 mr-2" />
+                <span>OK, Turn Off Alarm</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

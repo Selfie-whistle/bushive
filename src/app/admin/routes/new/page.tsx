@@ -10,7 +10,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Save, Route, ChevronRight, Copy } from 'lucide-react';
+import { ArrowLeft, Save, Route, ChevronRight, Copy, Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { dataService } from '@/lib/data/client-service';
 import { useFirebase } from '@/firebase';
@@ -41,25 +52,42 @@ export default function AddNewRoutePage() {
     },
   });
 
+  const loadServices = async () => {
+      setIsLoadingServices(true);
+      try {
+          const fetchedServices = await dataService.getServices();
+          setServices(fetchedServices);
+      } catch (error) {
+          toast({
+              title: 'Error fetching routes',
+              description: 'Could not load existing routes.',
+              variant: 'destructive',
+          });
+      } finally {
+          setIsLoadingServices(false);
+      }
+  };
+
   useEffect(() => {
-    async function loadServices() {
-        setIsLoadingServices(true);
-        try {
-            const fetchedServices = await dataService.getServices();
-            setServices(fetchedServices);
-        } catch (error) {
-            toast({
-                title: 'Error fetching routes',
-                description: 'Could not load existing routes.',
-                variant: 'destructive',
-            });
-        } finally {
-            setIsLoadingServices(false);
-        }
-    }
     loadServices();
   }, [toast]);
 
+  const handleDeleteService = async (serviceId: string) => {
+      try {
+          await dataService.deleteService(serviceId);
+          toast({
+              title: "Service Deleted",
+              description: `Service ${serviceId} has been successfully deleted.`,
+          });
+          loadServices();
+      } catch (error: any) {
+          toast({
+              title: "Delete Failed",
+              description: error.message || "Failed to delete the service.",
+              variant: "destructive"
+          });
+      }
+  };
 
   const onSubmit = async (data: FormValues) => {
     if (!user) {
@@ -70,7 +98,8 @@ export default function AddNewRoutePage() {
     
     try {
         const locations = [data.origin, data.destination].sort();
-        const serviceId = locations.map(l => l.toLowerCase().replace(/\s+/g, '-')).join('-');
+        const randomCode = Math.floor(100000 + Math.random() * 900000);
+        const serviceId = `TRP-${randomCode}`;
         
         await dataService.addService(serviceId, {
             id: serviceId,
@@ -175,6 +204,32 @@ export default function AddNewRoutePage() {
                                 <Link href={`/admin/route/${service.id}`}>
                                     <ChevronRight className="h-5 w-5 text-muted-foreground" />
                                 </Link>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10 ml-2"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Delete this service?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                This will permanently delete the service <strong>{service.id}</strong>.
+                                                Are you sure you want to proceed?
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleDeleteService(service.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                                Delete
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
                             </div>
                         </div>
                     ))}

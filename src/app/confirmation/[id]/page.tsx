@@ -27,6 +27,8 @@ function ConfirmationPageContent({ id, from }: { id: string, from: string | unde
   const [service, setService] = useState<Service | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [mealBenefit, setMealBenefit] = useState<any>(null);
+
 
   useEffect(() => {
     async function fetchBookingDetails() {
@@ -51,7 +53,17 @@ function ConfirmationPageContent({ id, from }: { id: string, from: string | unde
               const serviceData = await dataService.getServiceById(scheduleData.serviceId);
               setService(serviceData);
             }
+
+            // Check for meal benefit
+            if (user) {
+              const sub = await dataService.getPremiumSubscription(user.uid);
+              if (sub) {
+                const benefit = sub.mealBenefits.find((b: any) => b.tripId === id);
+                if (benefit) setMealBenefit(benefit);
+              }
+            }
           } else {
+
              setError('Could not retrieve full trip details.');
           }
         } else {
@@ -162,7 +174,9 @@ function ConfirmationPageContent({ id, from }: { id: string, from: string | unde
                 schedule={schedule}
                 service={service}
                 fromAdmin={fromAdmin}
+                mealBenefit={mealBenefit}
             />
+
         </div>
 
         <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">

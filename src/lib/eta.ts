@@ -47,3 +47,62 @@ export function calculateRoughETA(distance: number, speed: number): string {
   }
   return `${minutes}m`;
 }
+
+/**
+ * Calculates real-time distance and estimated time of arrival (ETA) for a rest stop from live bus location.
+ */
+export function calculateRestStopEta(
+  currentLocation: { lat: number; lng: number; speed?: number | null } | null | undefined,
+  stopCoordinates: string | { lat: number; lng: number } | null | undefined
+): { distance: string; remainingTime: string; eta: string; durationMinutes: number } | null {
+  if (!currentLocation || typeof currentLocation.lat !== 'number' || typeof currentLocation.lng !== 'number') return null;
+  if (!stopCoordinates) return null;
+
+  let stopLat: number | null = null;
+  let stopLng: number | null = null;
+
+  if (typeof stopCoordinates === 'object' && 'lat' in stopCoordinates && 'lng' in stopCoordinates) {
+    stopLat = Number((stopCoordinates as any).lat);
+    stopLng = Number((stopCoordinates as any).lng);
+  } else if (typeof stopCoordinates === 'string') {
+    const parts = stopCoordinates.split(',').map(s => parseFloat(s.trim()));
+    if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+      stopLat = parts[0];
+      stopLng = parts[1];
+    }
+  }
+
+  if (stopLat === null || stopLng === null || isNaN(stopLat) || isNaN(stopLng)) return null;
+
+  const straightKm = getDistanceKm(currentLocation.lat, currentLocation.lng, stopLat, stopLng);
+  // Real driving distance accounts for road curves (~1.3x straight line)
+  const roadKm = straightKm * 1.3;
+  
+  // Speed in km/h (minimum 35, maximum 65, default 50 for buses)
+  let speedKmH = 50;
+  if (currentLocation.speed && currentLocation.speed > 15) {
+    speedKmH = Math.min(65, Math.max(35, currentLocation.speed));
+  }
+
+  const durationMinutes = Math.max(1, Math.round((roadKm / speedKmH) * 60));
+  const etaDate = new Date(Date.now() + durationMinutes * 60000);
+  const eta = etaDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  let remainingTime = '';
+  if (durationMinutes < 60) {
+    remainingTime = `${durationMinutes} min`;
+  } else {
+    const hours = Math.floor(durationMinutes / 60);
+    const mins = durationMinutes % 60;
+    remainingTime = mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  }
+
+  const distance = roadKm >= 1 ? `${roadKm.toFixed(1)} km` : `${Math.round(roadKm * 1000)} m`;
+
+  return {
+    distance,
+    remainingTime,
+    eta,
+    durationMinutes,
+  };
+}

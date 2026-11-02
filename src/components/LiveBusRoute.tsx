@@ -1,5 +1,8 @@
 'use client';
 
+// Global queue to prevent OSRM 429 Too Many Requests
+let routingQueue = Promise.resolve();
+
 import React, { useEffect, useRef } from 'react';
 import { useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -90,9 +93,14 @@ const LiveBusRoute: React.FC<LiveBusRouteProps> = ({
     return () => {
       if (map && routingControlRef.current) {
         try {
-          routingControlRef.current.getPlan().setWaypoints([]);
-          map.removeControl(routingControlRef.current);
+          // Suppress errors during cleanup if layers are already detached
+          const control = routingControlRef.current;
           routingControlRef.current = null;
+          
+          if (control.getPlan()) {
+             try { control.getPlan().setWaypoints([]); } catch(e) {}
+          }
+          try { map.removeControl(control); } catch(e) {}
         } catch (e) {
           console.warn("Could not clean up routing control.", e);
         }
@@ -125,10 +133,25 @@ const LiveBusRoute: React.FC<LiveBusRouteProps> = ({
     const isDifferent = waypointsLatLng.length !== currentWps.length || 
                         waypointsLatLng.some((wp, i) => !wp || !currentWps[i] || wp.distanceTo(currentWps[i]) > 5);
 
+    let isMounted = true;
+
     if (isDifferent) {
-      routingControlRef.current.setWaypoints(waypointsLatLng);
+      routingQueue = routingQueue.then(() => new Promise<void>(resolve => {
+         if (isMounted && routingControlRef.current) {
+             try {
+                 routingControlRef.current.setWaypoints(waypointsLatLng);
+             } catch(e) {
+                 console.warn("Error setting waypoints", e);
+             }
+         }
+         // Wait 1.5 seconds before allowing the next request
+         setTimeout(resolve, 1500);
+      }));
     }
     
+    return () => {
+        isMounted = false;
+    };
   }, [liveLocation, startPoint, destinationPoint, waypoints]);
 
   return null;

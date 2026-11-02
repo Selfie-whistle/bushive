@@ -24,7 +24,7 @@ import {
   limit,
 } from 'firebase/firestore';
 import { getStorage, ref, getDownloadURL, uploadBytesResumable, type UploadTaskSnapshot } from 'firebase/storage';
-import type { Booking, Bus as BusType, SeatLayout, Schedule, PointGroup, Point, RestStop, EmergencyKitRequest, Service, Expense, Notification, Review } from '../types';
+import type { Booking, Bus as BusType, SeatLayout, Schedule, PointGroup, Point, RestStop, EmergencyKitRequest, StopRequest, Service, Expense, Notification, Review, PremiumSubscription, MealLog, LuggageRecord } from '../types';
 import { useToast, toast } from '@/hooks/use-toast';
 import { initializeFirebase } from '@/firebase';
 import { generateIndianSleeper36Layout } from '../seat-layouts/indianSleeper36';
@@ -165,6 +165,22 @@ export const dataService = {
     });
   },
 
+  async addLuggageRecord(record: Omit<LuggageRecord, 'id'>): Promise<LuggageRecord> {
+    const recordsRef = collection(getDb(), 'luggageRecords');
+    const docRef = doc(recordsRef);
+    const newRecord: LuggageRecord = { ...record, id: docRef.id };
+    
+    await setDoc(docRef, newRecord).catch(async (error) => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+        path: docRef.path,
+        operation: 'create',
+        requestResourceData: newRecord,
+      }));
+    });
+    
+    return newRecord;
+  },
+
   async markCrewAttendance(scheduleId: string, role: string, checkedIn: boolean, onHotseat?: boolean, duty?: 'first' | 'second' | null): Promise<void> {
     const scheduleRef = doc(getDb(), 'schedules', scheduleId);
     if (checkedIn) {
@@ -294,6 +310,19 @@ export const dataService = {
     });
   },
 
+  async clearBroadcastMessage(scheduleId: string): Promise<void> {
+    const scheduleRef = doc(getDb(), 'schedules', scheduleId);
+    await updateDoc(scheduleRef, {
+      broadcast: null
+    }).catch(async (error) => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+        path: scheduleRef.path,
+        operation: 'update',
+        requestResourceData: { broadcast: null },
+      }));
+    });
+  },
+
   onBusesSnapshot(callback: (buses: BusType[]) => void, onError: (error: Error) => void) {
     const busesQuery = collection(getDb(), 'buses');
     return onSnapshot(busesQuery, (snapshot) => {
@@ -383,6 +412,90 @@ export const dataService = {
         );
 
         transaction.update(scheduleRef, { kitRequests: updatedRequests });
+    });
+  },
+
+  async requestBusStop(scheduleId: string, bookingId: string, seatNumber: string, passengerName: string, type: 'washroom' | 'vomiting'): Promise<StopRequest> {
+    const scheduleRef = doc(getDb(), 'schedules', scheduleId);
+    const newRequest: StopRequest = {
+        id: `stopreq_${Date.now()}_${seatNumber}_${Math.random().toString(36).substring(2, 6)}`,
+        scheduleId,
+        bookingId,
+        seatNumber,
+        passengerName,
+        type,
+        status: 'pending',
+        requestedAt: new Date().toISOString(),
+    };
+
+    await updateDoc(scheduleRef, {
+        stopRequests: arrayUnion(newRequest),
+        activeStopRequest: newRequest,
+    });
+
+    return newRequest;
+  },
+
+  async respondToStopRequest(scheduleId: string, requestId: string, responseMessage: string): Promise<void> {
+    const scheduleRef = doc(getDb(), 'schedules', scheduleId);
+    await runTransaction(getDb(), async (transaction) => {
+        const scheduleDoc = await transaction.get(scheduleRef);
+        if (!scheduleDoc.exists()) throw new Error("Schedule not found");
+
+        const scheduleData = scheduleDoc.data() as Schedule;
+        const requests = scheduleData.stopRequests || [];
+        const respondedAt = new Date().toISOString();
+
+        let updatedActive: StopRequest | null = null;
+        const updatedRequests = requests.map(req => {
+            if (req.id === requestId) {
+                const resReq: StopRequest = {
+                    ...req,
+                    status: 'responded',
+                    responseMessage,
+                    respondedAt,
+                };
+                updatedActive = resReq;
+                return resReq;
+            }
+            return req;
+        });
+
+        transaction.update(scheduleRef, {
+            stopRequests: updatedRequests,
+            activeStopRequest: updatedActive || scheduleData.activeStopRequest || null,
+        });
+    });
+  },
+
+  async acknowledgeStopRequest(scheduleId: string, requestId: string): Promise<void> {
+    const scheduleRef = doc(getDb(), 'schedules', scheduleId);
+    await runTransaction(getDb(), async (transaction) => {
+        const scheduleDoc = await transaction.get(scheduleRef);
+        if (!scheduleDoc.exists()) throw new Error("Schedule not found");
+
+        const scheduleData = scheduleDoc.data() as Schedule;
+        const requests = scheduleData.stopRequests || [];
+        const acknowledgedAt = new Date().toISOString();
+
+        const updatedRequests = requests.map(req => {
+            if (req.id === requestId) {
+                return {
+                    ...req,
+                    status: 'resolved' as const,
+                    acknowledgedByPassenger: true,
+                    acknowledgedAt,
+                };
+            }
+            return req;
+        });
+
+        const activeNeedsClear = scheduleData.activeStopRequest?.id === requestId;
+
+        transaction.update(scheduleRef, {
+            stopRequests: updatedRequests,
+            ...(activeNeedsClear ? { activeStopRequest: null } : {}),
+        });
     });
   },
 
@@ -555,6 +668,138 @@ export const dataService = {
     await batch.commit();
   },
 
+  async respondToEmergency(scheduleId: string, emergencyAlarm: any): Promise<void> {
+    const scheduleRef = doc(getDb(), 'schedules', scheduleId);
+    
+    await updateDoc(scheduleRef, {
+        'emergencyAlarm.active': false,
+        emergencyHistory: arrayUnion({
+            timestamp: emergencyAlarm.timestamp,
+            seatNumber: emergencyAlarm.seatNumber,
+            passengerName: emergencyAlarm.passengerName,
+            bookingId: emergencyAlarm.bookingId,
+            respondedAt: new Date().toISOString(),
+            status: 'responded',
+            severe: emergencyAlarm.severe || false,
+            severeAt: emergencyAlarm.severeAt || null
+        })
+    });
+  },
+
+  async withdrawEmergency(scheduleId: string, emergencyAlarm: any): Promise<void> {
+    const scheduleRef = doc(getDb(), 'schedules', scheduleId);
+    const withdrawnAt = new Date().toISOString();
+
+    await updateDoc(scheduleRef, {
+        'emergencyAlarm.active': false,
+        'emergencyAlarm.withdrawn': true,
+        'emergencyAlarm.withdrawnAt': withdrawnAt,
+        emergencyHistory: arrayUnion({
+            timestamp: emergencyAlarm.timestamp || withdrawnAt,
+            seatNumber: emergencyAlarm.seatNumber || 'Unknown',
+            passengerName: emergencyAlarm.passengerName || 'Passenger',
+            bookingId: emergencyAlarm.bookingId || '',
+            withdrawnAt: withdrawnAt,
+            status: 'withdrawn',
+            severe: emergencyAlarm.severe || false,
+            severeAt: emergencyAlarm.severeAt || null
+        })
+    });
+  },
+
+  async submitIncidentReport(scheduleId: string, timestamp: string, reportText: string, aiAnalysisText: string): Promise<void> {
+    const scheduleRef = doc(getDb(), 'schedules', scheduleId);
+    const snap = await getDoc(scheduleRef);
+    if (!snap.exists()) return;
+    const data = snap.data();
+    if (!data.emergencyHistory) return;
+
+    const updatedHistory = data.emergencyHistory.map((h: any) => {
+        if (h.timestamp === timestamp) {
+            return {
+                ...h,
+                issueReport: reportText,
+                reportedAt: new Date().toISOString(),
+                aiAnalysis: aiAnalysisText
+            };
+        }
+        return h;
+    });
+
+    const updatePayload: any = { emergencyHistory: updatedHistory };
+    if (data.pendingReportRequest && data.pendingReportRequest.incidentTimestamp === timestamp) {
+        updatePayload.pendingReportRequest = deleteField();
+    }
+
+    await updateDoc(scheduleRef, updatePayload);
+  },
+
+  async requestIncidentReport(scheduleId: string, timestamp: string, seatNumber: string, passengerName: string): Promise<void> {
+    const scheduleRef = doc(getDb(), 'schedules', scheduleId);
+    const snap = await getDoc(scheduleRef);
+    if (!snap.exists()) return;
+    const data = snap.data();
+
+    let updatedHistory = data.emergencyHistory;
+    if (Array.isArray(updatedHistory)) {
+        updatedHistory = updatedHistory.map((h: any) => {
+            if (h.timestamp === timestamp) {
+                return {
+                    ...h,
+                    reportRequested: true,
+                    reportRequestedAt: new Date().toISOString()
+                };
+            }
+            return h;
+        });
+    }
+
+    const payload: any = {
+        pendingReportRequest: {
+            id: `req_${timestamp}`,
+            incidentTimestamp: timestamp,
+            scheduleId,
+            seatNumber,
+            passengerName: passengerName || 'Passenger',
+            requestedAt: new Date().toISOString(),
+            active: true
+        }
+    };
+    if (updatedHistory) {
+        payload.emergencyHistory = updatedHistory;
+    }
+
+    await updateDoc(scheduleRef, payload);
+  },
+
+  async dismissReportRequest(scheduleId: string): Promise<void> {
+    const scheduleRef = doc(getDb(), 'schedules', scheduleId);
+    await updateDoc(scheduleRef, {
+        pendingReportRequest: deleteField()
+    });
+  },
+
+  async approveIncidentReport(scheduleId: string, timestamp: string): Promise<void> {
+    const scheduleRef = doc(getDb(), 'schedules', scheduleId);
+    const snap = await getDoc(scheduleRef);
+    if (!snap.exists()) return;
+    const data = snap.data();
+    if (!data.emergencyHistory) return;
+
+    const updatedHistory = data.emergencyHistory.map((h: any) => {
+        if (h.timestamp === timestamp) {
+            return {
+                ...h,
+                adminApproved: true,
+                adminApprovedAt: new Date().toISOString()
+            };
+        }
+        return h;
+    });
+
+    await updateDoc(scheduleRef, { emergencyHistory: updatedHistory });
+  },
+
   async getSchedules(): Promise<Schedule[]> {
     const snap = await getDocs(collection(getDb(), "schedules"));
     return snap.docs.map(d => ({ id: d.id, ...d.data() as any }));
@@ -624,12 +869,23 @@ export const dataService = {
   },
 
   async updateService(serviceId: string, serviceData: Partial<Service>): Promise<void> {
-    const serviceRef = doc(getDb(), 'services', serviceId);
-    await setDoc(serviceRef, serviceData, { merge: true }).catch(async (error) => {
+    const ref = doc(getDb(), "services", serviceId);
+    await updateDoc(ref, serviceData).catch(async (error) => {
       errorEmitter.emit('permission-error', new FirestorePermissionError({
-        path: serviceRef.path,
+        path: ref.path,
         operation: 'update',
         requestResourceData: serviceData,
+      }));
+    });
+  },
+
+  async deleteService(serviceId: string): Promise<void> {
+    const ref = doc(getDb(), "services", serviceId);
+    await deleteDoc(ref).catch(async (error) => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+        path: ref.path,
+        operation: 'delete',
+        requestResourceData: null,
       }));
     });
   },
@@ -687,8 +943,8 @@ export const dataService = {
     const service = schedule?.serviceId ? await this.getServiceById(schedule.serviceId) : null;
 
     const isReturn = schedule?.direction === 'RETURN';
-    const boardingPoints = isReturn ? service?.boardingPointsReturn : service?.boardingPointsForward;
-    const droppingPoints = isReturn ? service?.droppingPointsReturn : service?.droppingPointsForward;
+    const boardingPoints = isReturn ? (service?.boardingPointsReturn || bus?.boardingPointsReturn) : (service?.boardingPointsForward || bus?.boardingPointsForward);
+    const droppingPoints = isReturn ? (service?.droppingPointsReturn || bus?.droppingPointsReturn) : (service?.droppingPointsForward || bus?.droppingPointsForward);
 
     const fullBookingData: Booking = {
         ...bookingData,
@@ -699,15 +955,15 @@ export const dataService = {
         busDetails: {
             name: bus?.travelsName || '',
             operator: bus?.operator || '',
-            origin: bus?.origin || '',
-            destination: bus?.destination || '',
-            departureTime: bus?.departureTime || '',
-            arrivalTime: bus?.arrivalTime || '',
+            origin: isReturn ? (bus?.destination || '') : (bus?.origin || ''),
+            destination: isReturn ? (bus?.origin || '') : (bus?.destination || ''),
+            departureTime: isReturn ? (bus?.departureTimeReturn || bus?.departureTime || '') : (bus?.departureTime || ''),
+            arrivalTime: isReturn ? (bus?.arrivalTimeReturn || bus?.arrivalTime || '') : (bus?.arrivalTime || ''),
             duration: bus?.duration || '',
             busNumber: bus?.busNumber || '',
-            contactNumber: bus?.contactNumber || undefined,
-            boardingPoints: boardingPoints,
-            droppingPoints: droppingPoints,
+            contactNumber: bus?.contactNumber || null,
+            boardingPoints: boardingPoints || [],
+            droppingPoints: droppingPoints || [],
         }
     };
 
@@ -756,21 +1012,23 @@ export const dataService = {
     const bookings = await Promise.all(snapshot.docs.map(async (docSnap) => {
         const bookingData = docSnap.data() as Booking;
         const bus = await dataService.getBusById(bookingData.busId);
+        const schedule = bookingData.scheduleId ? await dataService.getSchedule(bookingData.scheduleId) : null;
+        const isReturn = schedule?.direction === 'RETURN';
         return {
             ...bookingData,
             id: docSnap.id,
             busDetails: bus ? {
                 name: bus.travelsName,
                 operator: bus.operator || '',
-                origin: bus.origin,
-                destination: bus.destination,
-                departureTime: bus.departureTime,
-                arrivalTime: bus.arrivalTime,
+                origin: isReturn ? bus.destination : bus.origin,
+                destination: isReturn ? bus.origin : bus.destination,
+                departureTime: isReturn ? (bus.departureTimeReturn || bus.departureTime) : bus.departureTime,
+                arrivalTime: isReturn ? (bus.arrivalTimeReturn || bus.arrivalTime) : bus.arrivalTime,
                 duration: bus.duration || '',
                 busNumber: bus.busNumber,
-                contactNumber: bus.contactNumber || undefined,
-                boardingPoints: bus.boardingPointsForward || [],
-                droppingPoints: bus.droppingPointsForward || [],
+                contactNumber: bus.contactNumber || null,
+                boardingPoints: isReturn ? (bus.boardingPointsReturn || []) : (bus.boardingPointsForward || []),
+                droppingPoints: isReturn ? (bus.droppingPointsReturn || []) : (bus.droppingPointsForward || []),
             } : bookingData.busDetails,
         };
     }));
@@ -807,6 +1065,20 @@ export const dataService = {
     };
   },
 
+  onPublicBookingSnapshot(bookingId: string, callback: (booking: Booking | null) => void) {
+    const publicBookingRef = doc(getDb(), 'publicBookings', bookingId);
+    return onSnapshot(publicBookingRef, (docSnapshot) => {
+        if (docSnapshot.exists()) {
+            callback({ id: docSnapshot.id, ...docSnapshot.data() } as Booking);
+        } else {
+            callback(null);
+        }
+    }, (error) => {
+      console.error("Error listening to public booking:", error);
+      callback(null);
+    });
+  },
+
   onBookingSnapshot(userId: string, bookingId: string, callback: (booking: Booking | null) => void) {
     const userBookingRef = doc(getDb(), 'users', userId, 'bookings', bookingId);
 
@@ -828,21 +1100,22 @@ export const dataService = {
             const bus = await dataService.getBusById(bookingData.busId);
             const service = await dataService.getServiceById(scheduleData.serviceId!);
 
+            const isReturn = scheduleData?.direction === 'RETURN';
             const fullBooking: Booking = {
                 ...bookingData,
                 id: userBookingSnap.id,
                 busDetails: bus && service ? {
                     name: bus.travelsName,
                     operator: bus.operator || 'Unknown Operator',
-                    origin: bus.origin,
-                    destination: bus.destination,
-                    departureTime: bus.departureTime,
-                    arrivalTime: bus.arrivalTime,
+                    origin: isReturn ? bus.destination : bus.origin,
+                    destination: isReturn ? bus.origin : bus.destination,
+                    departureTime: isReturn ? (bus.departureTimeReturn || bus.departureTime) : bus.departureTime,
+                    arrivalTime: isReturn ? (bus.arrivalTimeReturn || bus.arrivalTime) : bus.arrivalTime,
                     duration: bus.duration || '',
                     busNumber: bus.busNumber,
-                    contactNumber: bus.contactNumber || undefined,
-                    boardingPoints: service.boardingPointsForward || [],
-                    droppingPoints: service.droppingPointsForward || [],
+                    contactNumber: bus.contactNumber || null,
+                    boardingPoints: isReturn ? (service.boardingPointsReturn || bus.boardingPointsReturn || []) : (service.boardingPointsForward || bus.boardingPointsForward || []),
+                    droppingPoints: isReturn ? (service.droppingPointsReturn || bus.droppingPointsReturn || []) : (service.droppingPointsForward || bus.droppingPointsForward || []),
                 } : bookingData.busDetails,
                 scheduleBookings: scheduleData.bookings, 
             };
@@ -858,36 +1131,66 @@ export const dataService = {
   },
 
   async getBookingById(userId: string, bookingId: string): Promise<Booking | null> {
-    const bookingRef = doc(getDb(), 'users', userId, 'bookings', bookingId);
-    const bookingSnap = await getDoc(bookingRef);
-    if (!bookingSnap.exists()) return null;
+    try {
+      let bookingData: any = null;
+      let snapId = bookingId;
 
-    const bookingData = bookingSnap.data() as Omit<Booking, 'id'>;
-    const bus = await dataService.getBusById(bookingData.busId);
-    const schedule = await this.getSchedule(bookingData.scheduleId);
-    const service = schedule ? await dataService.getServiceById(schedule.serviceId!) : null;
+      if (userId) {
+        const bookingRef = doc(getDb(), 'users', userId, 'bookings', bookingId);
+        const bookingSnap = await getDoc(bookingRef);
+        if (bookingSnap.exists()) {
+          bookingData = bookingSnap.data();
+          snapId = bookingSnap.id;
+        }
+      }
 
-    const fullBooking: Booking = {
-      ...bookingData,
-      id: bookingSnap.id,
-      busDetails: bus && service ? {
-        name: bus.travelsName,
-        operator: bus.operator || 'Unknown Operator',
-        origin: bus.origin,
-        destination: bus.destination,
-        departureTime: bus.departureTime,
-        arrivalTime: bus.arrivalTime,
-        duration: bus.duration || '',
-        busNumber: bus.busNumber,
-        contactNumber: bus.contactNumber || undefined,
-        boardingPoints: service.boardingPointsForward || [],
-        droppingPoints: service.droppingPointsForward || [],
-      } : bookingData.busDetails,
-    };
-    return fullBooking;
+      if (!bookingData) {
+        const pubRef = doc(getDb(), 'publicBookings', bookingId);
+        const pubSnap = await getDoc(pubRef);
+        if (pubSnap.exists()) {
+          bookingData = pubSnap.data();
+          snapId = pubSnap.id;
+        }
+      }
+
+      if (!bookingData) return null;
+
+      const bus = bookingData.busId ? await dataService.getBusById(bookingData.busId) : null;
+      const schedule = bookingData.scheduleId ? await this.getSchedule(bookingData.scheduleId) : null;
+      const service = schedule?.serviceId ? await dataService.getServiceById(schedule.serviceId!) : null;
+
+      const isReturn = schedule?.direction === 'RETURN';
+      const fullBooking: Booking = {
+        ...bookingData,
+        id: snapId,
+        busDetails: bus && service ? {
+          name: bus.travelsName,
+          operator: bus.operator || 'Unknown Operator',
+          origin: isReturn ? bus.destination : bus.origin,
+          destination: isReturn ? bus.origin : bus.destination,
+          departureTime: isReturn ? (bus.departureTimeReturn || bus.departureTime) : bus.departureTime,
+          arrivalTime: isReturn ? (bus.arrivalTimeReturn || bus.arrivalTime) : bus.arrivalTime,
+          duration: bus.duration || '',
+          busNumber: bus.busNumber,
+          contactNumber: bus.contactNumber || null,
+          boardingPoints: isReturn ? (service.boardingPointsReturn || bus.boardingPointsReturn || []) : (service.boardingPointsForward || bus.boardingPointsForward || []),
+          droppingPoints: isReturn ? (service.droppingPointsReturn || bus.droppingPointsReturn || []) : (service.droppingPointsForward || bus.droppingPointsForward || []),
+        } : bookingData.busDetails,
+      };
+      return fullBooking;
+    } catch (e) {
+      console.error("Error in getBookingById:", e);
+      return null;
+    }
   },
 
-  async bookSeats(scheduleId: string, seats: { seatNumber: string; gender: string }[], userId: string, bookingId: string) {
+  async bookSeats(
+    scheduleId: string, 
+    seats: { seatNumber: string; gender: string; passengerName?: string; boardingPoint?: string }[], 
+    userId: string, 
+    bookingId: string,
+    metadata?: { boardingPoint?: string; boardingMain?: string; passengerName?: string }
+  ) {
     const scheduleRef = doc(getDb(), 'schedules', scheduleId);
     try {
         await runTransaction(getDb(), async (transaction) => {
@@ -905,7 +1208,18 @@ export const dataService = {
                 }
             }
 
-            const newBookings = seats.map(s => ({ seat: s.seatNumber, gender: s.gender, userId, bookingId, boarded: false, snackDistributed: false, bookedAt: new Date().toISOString() }));
+            const newBookings = seats.map(s => ({ 
+                seat: s.seatNumber, 
+                gender: s.gender as ('male' | 'female' | 'other'), 
+                userId, 
+                bookingId, 
+                boarded: false, 
+                snackDistributed: false, 
+                bookedAt: new Date().toISOString(),
+                boardingPoint: s.boardingPoint || metadata?.boardingPoint || '',
+                boardingMain: metadata?.boardingMain || '',
+                passengerName: s.passengerName || metadata?.passengerName || ''
+            }));
             const updatedBookings = [...existingBookings, ...newBookings];
             
             transaction.update(scheduleRef, {
@@ -917,6 +1231,100 @@ export const dataService = {
     } catch (error: any) {
         console.error("Booking transaction failed:", error);
         return { success: false, message: error.message };
+    }
+  },
+
+  async blockSeats(
+    scheduleId: string,
+    seatNumbers: string[],
+    adminUserId: string = 'admin'
+  ): Promise<{ success: boolean; message?: string }> {
+    const scheduleRef = doc(getDb(), 'schedules', scheduleId);
+    try {
+      await runTransaction(getDb(), async (transaction) => {
+        const scheduleDoc = await transaction.get(scheduleRef);
+        if (!scheduleDoc.exists()) {
+          throw new Error("Schedule not found.");
+        }
+
+        const scheduleData = scheduleDoc.data() as Schedule;
+        const existingBookings = Array.isArray(scheduleData.bookings) ? scheduleData.bookings : [];
+
+        // Check if any of the seats are already booked
+        for (const seatNumber of seatNumbers) {
+          const isAlreadyBooked = existingBookings.some((b: any) => b.seat === seatNumber);
+          if (isAlreadyBooked) {
+            throw new Error(`Seat ${seatNumber} is already booked or blocked.`);
+          }
+        }
+
+        const now = new Date().toISOString();
+        const newBlockedBookings = seatNumbers.map(seatNumber => ({
+          seat: seatNumber,
+          gender: 'other' as const,
+          userId: adminUserId,
+          bookingId: `BLOCKED_${seatNumber}_${Date.now()}`,
+          passengerName: 'Blocked by Admin',
+          blocked: true,
+          boarded: false,
+          snackDistributed: false,
+          bookedAt: now,
+          boardingPoint: 'Admin Blocked',
+          boardingMain: 'Admin Blocked',
+        }));
+
+        const updatedBookings = [...existingBookings, ...newBlockedBookings];
+        const newAvailableSeats = Math.max(0, (scheduleData.availableSeats ?? scheduleData.totalSeats ?? 36) - seatNumbers.length);
+
+        transaction.update(scheduleRef, {
+          bookings: updatedBookings,
+          availableSeats: newAvailableSeats,
+        });
+      });
+      return { success: true };
+    } catch (error: any) {
+      console.error("blockSeats failed:", error);
+      return { success: false, message: error.message };
+    }
+  },
+
+  async unblockSeats(
+    scheduleId: string,
+    seatNumbers: string[]
+  ): Promise<{ success: boolean; message?: string }> {
+    const scheduleRef = doc(getDb(), 'schedules', scheduleId);
+    try {
+      await runTransaction(getDb(), async (transaction) => {
+        const scheduleDoc = await transaction.get(scheduleRef);
+        if (!scheduleDoc.exists()) {
+          throw new Error("Schedule not found.");
+        }
+
+        const scheduleData = scheduleDoc.data() as Schedule;
+        const existingBookings = Array.isArray(scheduleData.bookings) ? scheduleData.bookings : [];
+
+        const unblockedCount = existingBookings.filter(
+          (b: any) => seatNumbers.includes(b.seat) && b.blocked
+        ).length;
+
+        const updatedBookings = existingBookings.filter(
+          (b: any) => !(seatNumbers.includes(b.seat) && b.blocked)
+        );
+
+        const newAvailableSeats = Math.min(
+          scheduleData.totalSeats || 36,
+          (scheduleData.availableSeats ?? 0) + unblockedCount
+        );
+
+        transaction.update(scheduleRef, {
+          bookings: updatedBookings,
+          availableSeats: newAvailableSeats,
+        });
+      });
+      return { success: true };
+    } catch (error: any) {
+      console.error("unblockSeats failed:", error);
+      return { success: false, message: error.message };
     }
   },
 
@@ -1237,12 +1645,12 @@ export const dataService = {
             const scheduleData = scheduleDoc.data() as Schedule;
             const bookings = scheduleData.bookings || [];
 
-            const bookingIndex = bookings.findIndex((b: any) => b.bookingId === bookingId && b.seat === seatNumber);
+            const bookingIndex = bookings.findIndex((b: any) => String(b.bookingId) === String(bookingId) && String(b.seat) === String(seatNumber));
             if (bookingIndex !== -1) {
                 bookings[bookingIndex].boarded = boarded;
                 transaction.update(scheduleRef, { bookings });
             } else {
-                const fallbackIndex = bookings.findIndex((b: any) => b.bookingId === bookingId);
+                const fallbackIndex = bookings.findIndex((b: any) => String(b.bookingId) === String(bookingId));
                 if(fallbackIndex === -1) {
                    throw new Error("Booking not found in schedule.");
                 }
@@ -1397,8 +1805,117 @@ export const dataService = {
       const contextualError = new FirestorePermissionError({
         operation: 'list',
         path: 'reviews',
+        query: { busId },
       });
       errorEmitter.emit('permission-error', contextualError);
     });
   },
+
+  async getPremiumSubscription(userId: string): Promise<PremiumSubscription | null> {
+    const ref = doc(getDb(), 'premium_subscriptions', userId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return null;
+    return { id: snap.id, ...snap.data() } as PremiumSubscription;
+  },
+
+  async buyPremiumSubscription(userId: string, planPrice: number): Promise<void> {
+    const subscription: PremiumSubscription = {
+      userId,
+      planName: 'Premium',
+      status: 'active',
+      startDate: new Date(),
+      expiryDate: new Date(new Date().setFullYear(new Date().getFullYear() + 4)),
+      currentYear: 1,
+      currentYearTrips: 0,
+      totalTripsCompleted: 0,
+      mealBenefits: []
+    };
+    await setDoc(doc(getDb(), 'premium_subscriptions', userId), subscription);
+  },
+
+  async calculatePremiumDiscount(ticketPrice: number): Promise<number> {
+    const maxDiscount = ticketPrice * 0.2;
+    return Math.floor(maxDiscount);
+  },
+
+  async processPremiumBooking(userId: string, ticketPrice: number, bookingId: string, operatorId: string): Promise<string | null> {
+    const subRef = doc(getDb(), 'premium_subscriptions', userId);
+    let mealCode: string | null = null;
+    const discountAmount = await this.calculatePremiumDiscount(ticketPrice);
+
+    await runTransaction(getDb(), async (transaction) => {
+      const subSnap = await transaction.get(subRef);
+      if (!subSnap.exists()) return;
+      
+      const sub = subSnap.data() as PremiumSubscription;
+      let { currentYear, totalTripsCompleted, currentYearTrips, mealBenefits } = sub;
+
+        if (currentYearTrips >= 8) {
+          if (currentYear < 4) {
+            currentYear += 1;
+            currentYearTrips = 0;
+          } else {
+            transaction.update(subRef, { status: 'expired' });
+            return;
+          }
+        }
+
+      currentYearTrips += 1;
+      totalTripsCompleted += 1;
+
+      if (currentYearTrips % 4 === 0) {
+        mealCode = `MEAL-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+        mealBenefits.push({ tripId: bookingId, code: mealCode, isServed: false });
+        
+        transaction.set(doc(getDb(), 'meal_logs', mealCode), {
+          code: mealCode,
+          userId,
+          tripId: bookingId,
+          operatorId,
+          timestamp: new Date().toISOString(),
+          isServed: false,
+          crewEmail: ''
+        });
+      }
+
+      transaction.update(subRef, {
+        currentYear,
+        totalTripsCompleted,
+        currentYearTrips,
+        mealBenefits
+      });
+    });
+
+    return mealCode;
+  },
+
+  async verifyMealCode(code: string, crewEmail: string): Promise<{ success: boolean; message: string }> {
+    const mealRef = doc(getDb(), 'meal_logs', code.toUpperCase());
+    const mealSnap = await getDoc(mealRef);
+    if (!mealSnap.exists()) return { success: false, message: "Invalid meal code." };
+    
+    const meal = mealSnap.data() as MealLog;
+    if (meal.isServed) return { success: false, message: "Meal already served." };
+
+    await runTransaction(getDb(), async (transaction) => {
+      transaction.update(mealRef, {
+        isServed: true,
+        crewEmail,
+        timestamp: new Date().toISOString()
+      });
+
+      // Update the user's subscription record too
+      const subRef = doc(getDb(), 'premium_subscriptions', meal.userId);
+      const subSnap = await transaction.get(subRef);
+      if (subSnap.exists()) {
+        const sub = subSnap.data() as PremiumSubscription;
+        const mealBenefits = sub.mealBenefits.map((m: any) => 
+          m.code === code.toUpperCase() ? { ...m, isServed: true, servedAt: new Date().toISOString() } : m
+        );
+        transaction.update(subRef, { mealBenefits });
+      }
+    });
+
+    return { success: true, message: "Meal verified and served." };
+  }
 };

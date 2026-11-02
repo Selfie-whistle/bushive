@@ -1,23 +1,34 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import './globals.css';
-import { Poppins, PT_Sans } from 'next/font/google';
+import { Outfit, Plus_Jakarta_Sans } from 'next/font/google';
 import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/toaster';
 import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
 import { FirebaseClientProvider } from '@/firebase';
+import { PassengerGlobalMonitor } from '@/components/passenger-global-monitor';
 
-const fontSans = PT_Sans({ 
+export const metadata: Metadata = {
+  title: 'BharatBus',
+  description: 'BharatBus Management System',
+  manifest: '/manifest.json',
+};
+
+export const viewport = {
+  themeColor: '#2563eb',
+};
+
+const fontSans = Outfit({ 
   subsets: ['latin'], 
   variable: '--font-sans',
-  weight: ['400', '700']
+  weight: ['300', '400', '500', '600', '700']
 });
 
-const fontHeadline = Poppins({
+const fontHeadline = Plus_Jakarta_Sans({
   subsets: ['latin'],
   variable: '--font-headline',
-  weight: ['400', '600', '700']
+  weight: ['400', '600', '700', '800']
 });
 
 export default async function RootLayout({
@@ -40,6 +51,24 @@ export default async function RootLayout({
             integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
             crossOrigin=""
         />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (typeof window !== 'undefined') {
+                if ('serviceWorker' in navigator) {
+                  navigator.serviceWorker.getRegistrations().then(function(regs) {
+                    for (var r of regs) { r.unregister(); }
+                  });
+                }
+                if ('caches' in window) {
+                  caches.keys().then(function(names) {
+                    for (var n of names) { caches.delete(n); }
+                  });
+                }
+              }
+            `,
+          }}
+        />
       </head>
       <body className={cn('min-h-screen flex flex-col bg-background font-sans antialiased', fontSans.variable, fontHeadline.variable)}>
         <FirebaseClientProvider>
@@ -49,6 +78,7 @@ export default async function RootLayout({
             </main>
             {!hideFooter && <Footer />}
             <Toaster />
+            <PassengerGlobalMonitor />
         </FirebaseClientProvider>
       </body>
     </html>

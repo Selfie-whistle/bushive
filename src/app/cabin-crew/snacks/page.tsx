@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { dataService } from '@/lib/data/client-service';
-import type { Bus, Schedule } from '@/lib/types';
+import { cn } from '@/lib/utils';
+import type { Bus, Schedule, Seat } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Cookie, UserCheck, Frown } from 'lucide-react';
 import { useSchedule as useScheduleHook } from '@/hooks/use-schedule';
@@ -21,7 +22,125 @@ type PassengerSnackStatus = {
   snackDistributed: boolean;
   bookingId: string;
   boarded?: boolean;
+  gender?: string;
 };
+
+const getSeatType = (seat: Seat): string => {
+    if (!seat.number) return "";
+    const num = parseInt(seat.number.substring(1), 10);
+    if (num % 3 === 1) return "Single";
+    if (seat.row === 0) return "Window";
+    if (seat.row === 1) return "Aisle";
+    return "";
+};
+
+function SnackSeatBox({ 
+    seat, 
+    passenger,
+    onSeatClick 
+}: { 
+    seat: Seat; 
+    passenger?: PassengerSnackStatus; 
+    onSeatClick: (seat: string, bookingId: string, currentStatus: boolean) => void;
+}) {
+    const isBooked = !!passenger;
+    const isBoarded = passenger?.boarded;
+    const gender = passenger?.gender;
+    const isDistributed = passenger?.snackDistributed;
+    const canClick = isBooked;
+
+    return (
+        <div
+            onClick={() => canClick && onSeatClick(seat.number, passenger.bookingId, passenger.snackDistributed)}
+            className={cn(
+                "relative w-24 h-10 rounded-[6px] border-2 flex flex-col items-center justify-center text-[10px] font-headline transition",
+                !isBooked && "bg-white border-green-600 text-gray-500 opacity-50",
+                isBooked && !isDistributed && gender === "male" && "bg-white border-blue-600 text-blue-600",
+                isBooked && !isDistributed && gender === "female" && "bg-white border-pink-600 text-pink-600",
+                isBooked && isDistributed && gender === "male" && "bg-blue-600 border-blue-700 text-white",
+                isBooked && isDistributed && gender === "female" && "bg-pink-600 border-pink-700 text-white",
+                canClick ? "cursor-pointer hover:shadow-md" : "cursor-default"
+            )}
+        >
+            <div className={cn("text-[9px] font-sans font-bold", isBooked && isDistributed ? "text-white/80" : "text-gray-400")}>{getSeatType(seat)}</div>
+            
+            <div
+                className={cn(
+                "absolute right-[3px] top-1/2 -translate-y-1/2 w-[4px] h-[70%] rounded-full",
+                isBooked ? "bg-white/80" : "bg-gray-400"
+                )}
+            />
+            
+            <span className="text-[10px] font-sans font-semibold z-10 flex items-center gap-1">
+                {seat.number} 
+            </span>
+        </div>
+    );
+}
+
+function SnackBerth({
+    seats,
+    passengers,
+    onSeatClick,
+    title,
+}: {
+    seats: Seat[];
+    passengers: PassengerSnackStatus[];
+    onSeatClick: (seat: string, bookingId: string, currentStatus: boolean) => void;
+    title: string;
+}) {
+    if (seats.length === 0) return null;
+
+    const seatByNumber: Record<number, Seat> = {};
+    seats.forEach(seat => {
+        const num = parseInt(String(seat.number).replace(/\D/g, ""), 10);
+        if (!isNaN(num)) {
+            seatByNumber[num] = seat;
+        }
+    });
+
+    const rows = 3;
+    const cols = Math.ceil(seats.length / rows);
+
+    return (
+        <div className="mb-8 w-full overflow-x-auto">
+            <h3 className="text-center font-bold text-gray-500 mb-4">{title}</h3>
+            <div className="flex gap-12 w-max mx-auto px-4 pb-2">
+                {Array.from({ length: cols }).map((_, colIndex) => {
+                    const colStartNum = colIndex * 3 + 1;
+                    const seatsInCol = [
+                        seatByNumber[colStartNum + 2],
+                        seatByNumber[colStartNum + 1],
+                        null,
+                        seatByNumber[colStartNum]
+                    ];
+                    
+                    return (
+                        <div key={`col-${colIndex}`} className="flex flex-col gap-2">
+                            {seatsInCol.map((seat, rowIndex) => {
+                                if (seat === null) {
+                                    return <div key={`aisle-${colIndex}`} className="h-6" />;
+                                }
+                                if (!seat) {
+                                    return <div key={`empty-${colIndex}-${rowIndex}`} className="w-24 h-10" />;
+                                }
+                                const passenger = passengers.find(p => p.seat === seat.number);
+                                return (
+                                    <SnackSeatBox 
+                                        key={seat.id} 
+                                        seat={seat} 
+                                        passenger={passenger} 
+                                        onSeatClick={onSeatClick} 
+                                    />
+                                );
+                            })}
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
 
 function SnacksPageContent() {
   const searchParams = useSearchParams();
@@ -36,8 +155,9 @@ function SnacksPageContent() {
 
   useEffect(() => {
     async function fetchBusDetails() {
-      if (schedule?.busId) {
-        const busData = await dataService.getBusById(schedule.busId);
+      const busIdToFetch = schedule?.actualBusId || schedule?.busId;
+      if (busIdToFetch) {
+        const busData = await dataService.getBusById(busIdToFetch);
         setBus(busData);
       }
       setLoadingBus(false);
@@ -64,6 +184,7 @@ function SnacksPageContent() {
                 snackDistributed: !!bookingRef.snackDistributed,
                 bookingId: bookingRef.bookingId,
                 boarded: !!bookingRef.boarded,
+                gender: passenger?.gender || booking?.gender || 'male',
             }
         });
         const details = await Promise.all(detailsPromises);
@@ -151,37 +272,29 @@ function SnacksPageContent() {
             Check off passengers as you distribute snacks for the trip on {bus.travelsName} ({bus.busNumber}).
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3 max-h-[60vh] overflow-y-auto">
-          {passengerSnacks.length > 0 ? (
-            passengerSnacks.map((passenger) => (
-              <div
-                key={passenger.seat}
-                className="flex items-center justify-between p-3 border rounded-lg bg-background"
-              >
-                <div>
-                  <p className="font-semibold">{passenger.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    Seat: {passenger.seat}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                   <Label htmlFor={`snack-${passenger.seat}`} className="text-sm font-medium pr-2">
-                        {passenger.snackDistributed ? 'Distributed' : 'Pending'}
-                    </Label>
-                    <Checkbox 
-                        id={`snack-${passenger.seat}`}
-                        checked={passenger.snackDistributed}
-                        onCheckedChange={() => handleToggleSnack(passenger.seat, passenger.bookingId, passenger.snackDistributed)}
-                        disabled={!passenger.boarded}
+        <CardContent className="space-y-3 pt-6 max-h-[70vh] overflow-y-auto w-full">
+            <div className="relative w-full border-[3px] border-gray-400 rounded-lg p-6 bg-white min-h-[300px] flex items-center justify-center shadow-sm overflow-x-auto">
+                <div className="flex flex-col w-full gap-8">
+                    <SnackBerth 
+                        seats={bus.seatLayout?.seats?.filter(s => s.deck === 'lower') || []} 
+                        passengers={passengerSnacks} 
+                        onSeatClick={handleToggleSnack} 
+                        title="Lower Berth" 
+                    />
+                    <SnackBerth 
+                        seats={bus.seatLayout?.seats?.filter(s => s.deck === 'upper') || []} 
+                        passengers={passengerSnacks} 
+                        onSeatClick={handleToggleSnack} 
+                        title="Upper Berth" 
                     />
                 </div>
-              </div>
-            ))
-          ) : (
-            <p className="text-center text-muted-foreground py-4">
-              No passengers have booked this trip yet.
-            </p>
-          )}
+            </div>
+            <div className="flex flex-wrap justify-center gap-4 mt-6 text-xs text-muted-foreground font-medium">
+                <div className="flex items-center gap-2"><div className="w-4 h-4 border-2 border-blue-600 rounded"></div> Male Booked</div>
+                <div className="flex items-center gap-2"><div className="w-4 h-4 border-2 border-pink-600 rounded"></div> Female Booked</div>
+                <div className="flex items-center gap-2"><div className="w-4 h-4 border-2 border-green-600 rounded opacity-50"></div> Available</div>
+                <div className="flex items-center gap-2 ml-2"><div className="w-4 h-4 bg-blue-600 border-2 border-blue-700 rounded"></div> Snack Provided</div>
+            </div>
         </CardContent>
       </Card>
     </div>

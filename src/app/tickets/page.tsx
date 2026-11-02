@@ -28,7 +28,7 @@ function TicketsListPageContent() {
   const [bookings, setBookings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [sortOption, setSortOption] = useState("travelDateAsc");
-  const [filterOption] = useState(phoneSearch ? "upcoming" : "all");
+  const [filterOption, setFilterOption] = useState("all");
 
   useEffect(() => {
     async function findBookings() {
@@ -156,6 +156,16 @@ function TicketsListPageContent() {
                     </CardDescription>
                 </div>
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+                        <Select value={filterOption} onValueChange={setFilterOption}>
+                            <SelectTrigger className="w-full sm:w-[180px]" id="filter-by">
+                                <SelectValue placeholder="Filter by" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Bookings</SelectItem>
+                                <SelectItem value="upcoming">Upcoming Only</SelectItem>
+                                <SelectItem value="past">Past Only</SelectItem>
+                            </SelectContent>
+                        </Select>
                      <div className="flex items-center gap-2">
                         <Label htmlFor="sort-by" className="font-semibold shrink-0">Sort by</Label>
                          <Select value={sortOption} onValueChange={setSortOption}>
@@ -163,8 +173,8 @@ function TicketsListPageContent() {
                                 <SelectValue placeholder="Sort by" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="travelDateAsc">First Upcoming to Last</SelectItem>
-                                <SelectItem value="travelDateDesc">Last Upcoming to First</SelectItem>
+                                <SelectItem value="travelDateAsc">Date (Oldest First)</SelectItem>
+                                <SelectItem value="travelDateDesc">Date (Newest First)</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>

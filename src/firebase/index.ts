@@ -3,7 +3,7 @@
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore'
+import { getFirestore, initializeFirestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
@@ -34,11 +34,38 @@ export function initializeFirebase() {
 }
 
 export function getSdks(firebaseApp: FirebaseApp) {
+  let firestore = null;
+  try {
+    // Attempt to initialize with long polling auto-detection for unstable networks
+    firestore = initializeFirestore(firebaseApp, { experimentalAutoDetectLongPolling: true, ignoreUndefinedProperties: true });
+  } catch (e) {
+    // If already initialized, fallback to getFirestore
+    try {
+      firestore = getFirestore(firebaseApp);
+    } catch (err) {
+      console.warn("Firestore initialization failed:", err);
+    }
+  }
+
+  let auth = null;
+  try {
+    auth = getAuth(firebaseApp);
+  } catch (e) {
+    console.warn("Auth initialization failed (possibly blocked IndexedDB):", e);
+  }
+
+  let storage = null;
+  try {
+    storage = getStorage(firebaseApp);
+  } catch (e) {
+    console.warn("Storage initialization failed:", e);
+  }
+
   return {
     firebaseApp,
-    auth: getAuth(firebaseApp),
-    firestore: getFirestore(firebaseApp),
-    storage: getStorage(firebaseApp)
+    auth,
+    firestore,
+    storage
   };
 }
 

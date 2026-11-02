@@ -41,7 +41,7 @@ export function formatIndianDate(date: Date | null) {
 export function canSelectSeat(
   seat: string,
   gender: 'male' | 'female' | 'other' | undefined,
-  bookings: { seat: string; gender: 'male' | 'female' | 'other' }[],
+  bookings: { seat: string; gender: 'male' | 'female' | 'other'; blocked?: boolean }[],
   selectedSeats: string[]
 ): boolean {
   const adjacent = getAdjacentSeat(seat);
@@ -55,6 +55,9 @@ export function canSelectSeat(
 
   // if adjacent seat is empty → allowed
   if (!booked) return true;
+
+  // if adjacent seat is blocked by admin → allowed (no gender restriction applies)
+  if ((booked as any).blocked || booked.gender === 'other') return true;
 
   // if same gender → allowed
   return booked.gender === gender;

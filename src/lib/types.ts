@@ -61,6 +61,8 @@ export type ConsoleFeatures = {
   passengerRestStops: boolean;
   passengerAlarm: boolean;
   passengerEmergencyKit: boolean;
+  photoUpdate?: boolean;
+  luggageRegister?: boolean;
 };
 
 export type Service = {
@@ -132,6 +134,21 @@ export type EmergencyKitRequest = {
     status: 'pending' | 'acknowledged';
 };
 
+export type StopRequest = {
+    id: string;
+    scheduleId: string;
+    bookingId: string;
+    seatNumber: string;
+    passengerName: string;
+    type: 'washroom' | 'vomiting';
+    status: 'pending' | 'responded' | 'resolved';
+    requestedAt: string;
+    responseMessage?: string;
+    respondedAt?: string;
+    acknowledgedByPassenger?: boolean;
+    acknowledgedAt?: string;
+};
+
 export type Notification = {
   id: string;
   userId: string;
@@ -172,16 +189,62 @@ export type Schedule = {
         boarded?: boolean, 
         deboarded?: boolean,
         snackDistributed?: boolean,
+        bookedAt?: string,
+        boardingPoint?: string,
+        boardingMain?: string,
+        passengerName?: string,
+        blocked?: boolean,
     }[];
     seatPrices: { [key: string]: number };
     stopStatuses?: { [stopId: string]: { status: 'arrived' | 'departed' | 'upcoming'; timestamp: string; checkedInSeats?: string[] } };
     attendance?: { [role: string]: { timestamp: string, onHotseat?: boolean, duty?: 'first' | 'second' | null, hotseatSince?: string, dutyLocked?: boolean } };
     kitRequests?: EmergencyKitRequest[];
+    stopRequests?: StopRequest[];
+    activeStopRequest?: StopRequest | null;
     createdAt?: Date | null;
     tripStatus?: 'not-started' | 'in-progress' | 'completed';
     broadcast?: {
         message: string;
         timestamp: string;
+    };
+    emergencyAlarm?: {
+        active: boolean;
+        timestamp: string;
+        seatNumber: string;
+        passengerName: string;
+        bookingId: string;
+        severe?: boolean;
+        severeAt?: string;
+        withdrawn?: boolean;
+        withdrawnAt?: string;
+    };
+    emergencyHistory?: {
+        timestamp: string;
+        seatNumber: string;
+        passengerName: string;
+        bookingId: string;
+        respondedAt?: string;
+        status: 'responded' | 'withdrawn';
+        severe?: boolean;
+        severeAt?: string;
+        withdrawn?: boolean;
+        withdrawnAt?: string;
+        issueReport?: string;
+        reportedAt?: string;
+        adminApproved?: boolean;
+        adminApprovedAt?: string;
+        aiAnalysis?: string;
+        reportRequested?: boolean;
+        reportRequestedAt?: string;
+    }[];
+    pendingReportRequest?: {
+        id?: string;
+        incidentTimestamp: string;
+        scheduleId: string;
+        seatNumber: string;
+        passengerName: string;
+        requestedAt: string;
+        active?: boolean;
     };
 };
 
@@ -234,5 +297,43 @@ export type Booking = {
   boardedAt?: string;
   deboardedAt?: string;
   scheduleBookings?: { seat: string; gender: 'male' | 'female' | 'other'; userId: string, bookingId: string, boarded?: boolean }[];
-  generatedBy?: 'crew' | 'user';
+  generatedBy?: 'crew' | 'owner' | 'user';
+};
+
+export interface PremiumSubscription {
+  userId: string;
+  status: 'active' | 'expired';
+  planName: string;
+  startDate: any; // Firestore Timestamp
+  expiryDate: any; // Firestore Timestamp
+  currentYear: number; // 1, 2, 3, 4
+  currentYearTrips: number; // 0 to 32
+  totalTripsCompleted: number;
+  mealBenefits: { tripId: string; code: string; isServed: boolean; servedAt?: string }[];
+}
+
+export type MealLog = {
+  code: string;
+  userId: string;
+  tripId: string;
+  operatorId: string;
+  timestamp: string;
+  isServed: boolean;
+  crewEmail: string;
+};
+
+export type LuggageRecord = {
+  id: string;
+  scheduleId: string;
+  busId: string;
+  passengerName: string;
+  seatNumber?: string;
+  boardingPoint?: string;
+  droppingPoint?: string;
+  itemsCount?: number;
+  weight?: number;
+  description?: string;
+  amount?: number;
+  timestamp: string;
+  crewEmail: string;
 };

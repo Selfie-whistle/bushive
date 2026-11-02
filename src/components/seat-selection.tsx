@@ -22,12 +22,13 @@ interface SeatSelectionProps {
 const seatColor = (status: string) => {
     if (status === "male") return "bg-blue-700 text-white";
     if (status === "female") return "bg-pink-700 text-white";
+    if (status === "sold") return "bg-gray-200 text-gray-500 border-gray-400";
     if (status === "selected") return "bg-red-600 text-white border-red-800";
     return "bg-white text-black border-gray-400";
 };
 
 const SeatComponent = ({ seat, onClick, status }: { seat: Seat, onClick: (seat: string) => void, status: string }) => {
-    const isBooked = status === 'male' || status === 'female';
+    const isBooked = status === 'male' || status === 'female' || status === 'sold';
   
     return (
       <div
@@ -95,7 +96,10 @@ export function SeatSelection({ bus, onSeatSelection, gender, date }: SeatSelect
     if (selectedSeats.includes(seat.number)) return "selected";
     
     const booking = bookings.find((b: any) => b.seat === seat.number);
-    if (booking) return booking.gender;
+    if (booking) {
+      if (booking.blocked || booking.gender === 'other' || !booking.gender) return "sold";
+      return booking.gender;
+    }
 
     return "available";
   }, [bookings, selectedSeats]);
@@ -104,7 +108,7 @@ export function SeatSelection({ bus, onSeatSelection, gender, date }: SeatSelect
     const seat = (bus.seatLayout?.seats || []).find(s => s.number === seatNumber);
     if (!seat) return;
     const status = getSeatStatus(seat);
-    if (status === "male" || status === "female") return; // cannot select booked
+    if (status === "male" || status === "female" || status === "sold") return; // cannot select booked
 
     // If a gender is not yet selected for the first passenger, don't enforce rules
     if (gender) {

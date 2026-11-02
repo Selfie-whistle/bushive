@@ -54,28 +54,32 @@ export default function AllReviewsPage() {
       return;
     }
 
+    let unsubscribe: (() => void) | undefined;
+
     dataService.isAdmin(user.uid).then(status => {
       setIsAdmin(status);
       if (status) {
-        // Fetch buses
-        dataService.getBuses().then(busList => {
+        dataService.getBusesByOperator(user.uid, user.displayName || '').then(busList => {
           const busMap = busList.reduce((acc, bus) => {
             acc[bus.id] = bus;
             return acc;
           }, {} as Record<string, BusType>);
           setBuses(busMap);
-        });
 
-        // Listen for reviews
-        const unsubscribe = dataService.onAllReviewsSnapshot((allReviews) => {
-          setReviews(allReviews);
-          setLoading(false);
+          unsubscribe = dataService.onAllReviewsSnapshot((allReviews) => {
+            const operatorReviews = allReviews.filter(r => busMap[r.busId]);
+            setReviews(operatorReviews);
+            setLoading(false);
+          });
         });
-        return () => unsubscribe();
       } else {
         setLoading(false);
       }
     });
+
+    return () => {
+        if (unsubscribe) unsubscribe();
+    };
   }, [user, isUserLoading]);
 
   // Processed Reviews Logic

@@ -186,7 +186,7 @@ export default function AdminPanelPage() {
     { id: 'bookings', title: "Today's Bookings", value: todaysBookingsCount, icon: Ticket, path: '/admin/bookings'},
     { id: 'buses', title: 'Active Buses Today', value: activeBusesCount, icon: Bus, path: '/admin/trips' },
     { id: 'revenue', title: "Today's Revenue", value: `₹${todaysRevenue.toLocaleString('en-IN')}`, icon: IndianRupee, path: '/admin/reports' },
-    { id: 'generate-tickets', title: "Generate Tickets", value: "New & Old", icon: Ticket, path: '/admin/generate-tickets' },
+    { id: 'generate-tickets', title: "Book tickets", value: "Terminal & Block", icon: Ticket, path: '/admin/generate-tickets' },
     { id: 'tracking', title: 'Live Tracking', value: `${activeBusesCount} Online`, icon: MapPin, path: '/admin/track' },
     { id: 'cabin-crew', title: "Cabin Crew", value: "Manage", icon: Users, path: '/admin/cabin-crew' },
   ], [activeBusesCount, todaysBookingsCount, todaysRevenue]);

@@ -73,10 +73,15 @@ export function BusCard({
   
   useEffect(() => {
     if (bookingId) {
-      const status = localStorage.getItem(`boarded_${bookingId}`) === 'true';
-      setBoardedStatus(status);
+      const isLocallyMarked = 
+        localStorage.getItem(`boarded_${bookingId}`) === 'true' || 
+        localStorage.getItem(`bushive_welcome_shown_${bookingId}`) === 'true';
+      const isBoardedInSchedule = schedule?.bookings?.some(
+        (b: any) => b.bookingId === bookingId && b.boarded
+      );
+      setBoardedStatus(Boolean(isLocallyMarked || isBoardedInSchedule));
     }
-  }, [bookingId]);
+  }, [bookingId, schedule]);
 
   if (!bus || !schedule) return null;
 
@@ -245,75 +250,93 @@ export function BusCard({
 
   return (
     <Dialog>
-      <Card className="w-full hover:shadow-lg transition-shadow duration-300 overflow-hidden">
-        <CardContent className="p-0 flex flex-col md:flex-row">
-          {/* No Image Thumbnail as per request */}
-          
+      <Card className="w-full rounded-2xl hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 overflow-hidden bg-white border border-slate-100 group relative">
+        <CardContent className="p-0 flex flex-col md:flex-row h-full">
+          {/* Decorative Gradient Edge */}
+          <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-indigo-500 to-rose-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
 
           {/* Main Details Section */}
-          <div className="flex-grow p-4 space-y-2">
+          <div className="flex-grow p-4 md:p-5 space-y-3">
             <div className="flex justify-between items-start">
               <div>
-                <h3 className="text-lg font-headline font-semibold">{bus.travelsName}</h3>
-                <div className="flex flex-col md:flex-row md:items-center gap-x-4 text-sm text-muted-foreground">
-                  <p>{bus.busType} {bus.busModel ? `(${bus.busModel})` : ''}</p>
+                <h3 className="text-lg md:text-xl font-headline font-bold text-slate-800 tracking-tight">{bus.travelsName}</h3>
+                <div className="flex flex-col md:flex-row md:items-center gap-x-3 text-xs text-slate-500 mt-1">
+                  <p className="font-medium text-slate-600">{bus.busType} {bus.busModel ? <span className="opacity-70">({bus.busModel})</span> : ''}</p>
                   {!bookingId && (
-                    <p className="font-medium">
-                      <span className={cn(totalSeatsColorClass)}>
+                    <p className="font-medium flex items-center gap-1.5">
+                      <span className={cn("px-1.5 py-0.5 rounded text-[11px]", totalSeatsColorClass)}>
                         {totalAvailable} seats left
                       </span>
                       {singleSeatsAvailable > 0 && (
-                        <span className={cn(singleSeatsColorClass)}>
-                          {' '}({singleSeatsAvailable} single)
+                        <span className={cn("text-[11px]", singleSeatsColorClass)}>
+                          ({singleSeatsAvailable} single)
                         </span>
                       )}
                     </p>
                   )}
                   {seatNumbers && seatNumbers.length > 0 && (
-                    <div className="flex items-center gap-1">
-                      <Armchair className="w-4 h-4"/>
-                      <span className="font-medium text-foreground">{seatNumbers.join(', ')}</span>
+                    <div className="flex items-center gap-1 bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded text-[11px] font-bold">
+                      <Armchair className="w-3 h-3"/>
+                      <span>{seatNumbers.join(', ')}</span>
                     </div>
                   )}
                 </div>
               </div>
-              <Badge variant="outline" className="flex items-center gap-1 shrink-0">
-                <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                <span className="font-bold">{bus.rating || 'N/A'}</span>
+              <Badge variant="secondary" className="flex items-center gap-1 shrink-0 bg-yellow-100/50 text-yellow-700 hover:bg-yellow-100/80 border border-yellow-200 py-0.5">
+                <Star className="w-3 h-3 fill-yellow-500 text-yellow-500" />
+                <span className="font-bold text-xs">{bus.rating || 'N/A'}</span>
               </Badge>
             </div>
 
-            <div className="flex items-center justify-between text-sm font-medium mt-2">
-              <div className="text-center">
-                <p className="font-bold text-base text-foreground">
+            {/* Timings & Route Layout */}
+            <div className="flex items-center justify-between text-sm font-medium mt-4 bg-slate-50/50 rounded-xl p-3 border border-slate-100 relative">
+              
+              {/* Origin */}
+              <div className="text-left w-1/3">
+                <p className="font-bold text-xl font-headline text-slate-800">
                   {formatTime(boardingPointToShow?.time || bus.departureTime)}
-                  <span className="text-xs font-normal text-foreground"> ({departureDateTime ? format(departureDateTime, 'dd MMM') : ''})</span>
                 </p>
-                <p className="text-foreground">
+                <p className="text-slate-500 mt-0.5 truncate pr-2 text-xs" title={searchOrigin || bus.origin}>
                   {searchOrigin || bus.origin}
                 </p>
+                {departureDateTime && (
+                  <p className="text-[10px] font-semibold text-slate-400 mt-0.5">
+                    {format(departureDateTime, 'dd MMM yyyy')}
+                  </p>
+                )}
               </div>
             
-              <div className="text-center text-muted-foreground">
-                <ArrowRight className="w-4 h-4 mx-auto" />
-                <span>{bus.duration}</span>
+              {/* Duration Graphic */}
+              <div className="flex flex-col items-center justify-center w-1/3 absolute left-1/2 -translate-x-1/2">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 bg-white px-2 rounded-full border border-slate-100 z-10">{bus.duration}</div>
+                <div className="w-full h-px bg-slate-300 absolute top-1/2 flex items-center justify-between z-0">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-400 -ml-1"></div>
+                    <ArrowRight className="w-3.5 h-3.5 text-slate-400 absolute left-1/2 -translate-x-1/2 bg-slate-50/50" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-400 -mr-1"></div>
+                </div>
               </div>
             
-              <div className="text-center">
-                <p className="font-bold text-base text-foreground">
+              {/* Destination */}
+              <div className="text-right w-1/3">
+                <p className="font-bold text-xl font-headline text-slate-800">
                   {formatTime(droppingPointToShow?.time || bus.arrivalTime)}
-                   <span className="text-xs font-normal text-foreground"> ({arrivalDateTime ? format(arrivalDateTime, 'dd MMM') : ''})</span>
                 </p>
-                <p className="text-foreground">
+                <p className="text-slate-500 mt-0.5 truncate pl-2 text-xs" title={searchDestination || bus.destination}>
                   {searchDestination || bus.destination}
                 </p>
+                {arrivalDateTime && (
+                  <p className="text-[10px] font-semibold text-slate-400 mt-0.5">
+                    {format(arrivalDateTime, 'dd MMM yyyy')}
+                  </p>
+                )}
               </div>
             </div>
             
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground mt-1">
-              {bus.amenities?.slice(0, 4).map(amenity => (
-                <div key={amenity} className="flex items-center gap-1">
-                  {amenityIcons[amenity] || null}
+            {/* Amenities */}
+            <div className="flex flex-wrap items-center gap-1.5 mt-3">
+              {bus.amenities?.map(amenity => (
+                <div key={amenity} className="flex items-center gap-1 bg-slate-50 border border-slate-200 text-slate-600 px-1.5 py-0.5 rounded text-[10px] font-medium">
+                  <span className="opacity-70">{amenityIcons[amenity] || <Star className="w-3 h-3" />}</span>
                   <span>{amenity}</span>
                 </div>
               ))}
@@ -321,43 +344,51 @@ export function BusCard({
           </div>
 
           {/* Separator for mobile */}
-          <div className="md:hidden px-4">
-             <Separator />
+          <div className="md:hidden">
+             <Separator className="bg-slate-100" />
           </div>
 
           {/* Fare and Action Section */}
-          <div className="w-full md:w-48 flex flex-row md:flex-col items-center justify-between p-4 md:border-l">
-            <div className='text-left md:text-right w-full'>
-              <p className="text-sm text-muted-foreground">{bookingId ? 'Total Fare' : 'Starting from'}</p>
-              <p className="text-xl font-bold font-headline">₹{displayFare}</p>
+          <div className="w-full md:w-48 bg-gradient-to-b from-slate-50 to-indigo-50/30 flex flex-row md:flex-col items-center md:items-end justify-between p-4 md:border-l border-slate-100 relative">
+            
+            <div className='text-left md:text-right w-full mb-3 md:mb-0'>
+              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-0.5">{bookingId ? 'Total Fare' : 'Starting from'}</p>
+              <p className="text-2xl font-bold font-headline text-slate-900 tracking-tight">₹{displayFare}</p>
             </div>
-            <div className="w-full mt-0 md:mt-auto">
-              <Button asChild className="w-full">
+            
+            <div className="w-auto md:w-full mt-0 md:mt-auto">
+              <Button 
+                asChild 
+                className="w-full h-10 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold text-sm shadow-md shadow-indigo-200 hover:shadow-lg hover:shadow-indigo-300 transition-all active:scale-[0.98]"
+              >
                   <Link href={viewButtonHref()}>{viewButtonText()}</Link>
               </Button>
             </div>
           </div>
         </CardContent>
       </Card>
-      <DialogContent className="max-w-3xl h-[80vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Details for {bus.travelsName}</DialogTitle>
-          <DialogDescription>
-            {bus.origin} to {bus.destination} • {bus.busNumber}
+      
+      <DialogContent className="max-w-3xl h-[80vh] flex flex-col rounded-3xl overflow-hidden p-0">
+        <DialogHeader className="p-6 bg-slate-50 border-b border-slate-100">
+          <DialogTitle className="font-headline text-2xl">{bus.travelsName}</DialogTitle>
+          <DialogDescription className="text-base text-slate-500">
+            {bus.origin} to {bus.destination} • <span className="font-semibold">{bus.busNumber}</span>
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-grow relative p-4">
-            <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                <Map className="w-4 h-4" />
+        <div className="flex-grow relative p-6 bg-white">
+            <h4 className="text-lg font-bold mb-4 flex items-center gap-2 text-slate-800 font-headline">
+                <Map className="w-5 h-5 text-indigo-500" />
                 Route Map
             </h4>
-            {bus && service && (
-                <BusRouteMap 
-                    destinationPoint={droppingPointToShow}
-                    waypoints={boardingPoints}
-                />
-            )}
+            <div className="h-[calc(100%-2rem)] rounded-2xl overflow-hidden border border-slate-200 shadow-inner">
+                {bus && service && (
+                    <BusRouteMap 
+                        destinationPoint={droppingPointToShow}
+                        waypoints={boardingPoints}
+                    />
+                )}
+            </div>
         </div>
       </DialogContent>
     </Dialog>

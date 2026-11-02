@@ -128,7 +128,15 @@ export function TicketCard({
   };
 
   const handleTrackBus = () => {
-    router.push(`/track/${id}${fromAdmin ? '?from=admin' : ''}`);
+    const passengerSeat = booking.passengers?.[0]?.seatNumber;
+    const isBoarded = schedule?.bookings?.some(
+      (b: any) => b.bookingId === id && (!passengerSeat || b.seat === passengerSeat) && b.boarded
+    );
+    if (isBoarded) {
+      router.push(`/track/${id}/console${fromAdmin ? '?from=admin' : ''}`);
+    } else {
+      router.push(`/track/${id}${fromAdmin ? '?from=admin' : ''}`);
+    }
   };
 
   const isSleeper = bus.busType?.toLowerCase().includes('sleeper') || bus.busCategory?.toLowerCase().includes('sleeper');

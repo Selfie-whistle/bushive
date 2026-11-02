@@ -27,6 +27,8 @@ const defaultFeatures: ConsoleFeatures = {
   passengerRestStops: true,
   passengerAlarm: true,
   passengerEmergencyKit: true,
+  photoUpdate: true,
+  luggageRegister: true,
 };
 
 const cabinCrewFeatures: (keyof ConsoleFeatures)[] = [
@@ -37,6 +39,8 @@ const cabinCrewFeatures: (keyof ConsoleFeatures)[] = [
   'restStopCheckins',
   'createTicket',
   'busExpenses',
+  'photoUpdate',
+  'luggageRegister',
 ];
 
 const passengerFeatures: (keyof ConsoleFeatures)[] = [

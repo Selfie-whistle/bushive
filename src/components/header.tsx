@@ -54,12 +54,7 @@ export function Header() {
   const router = useRouter();
   const isAdmin = !!user?.email && ADMIN_EMAILS.includes(user.email);
   const isCabinCrew = user?.email === CABIN_CREW_EMAIL;
-  const [isMounted, setIsMounted] = React.useState(false);
   const [unreadCount, setUnreadCount] = React.useState(0);
-
-  React.useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   React.useEffect(() => {
     if (user) {
@@ -95,7 +90,7 @@ export function Header() {
           <span className="font-bold font-headline text-xl">{headerTitle}</span>
         </Link>
         <nav className="flex flex-1 items-center space-x-4 md:space-x-6 text-sm font-medium">
-          {isMounted && navLinks.map((link) => (
+          {navLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}

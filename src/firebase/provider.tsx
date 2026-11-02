@@ -76,17 +76,36 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
 
     setUserAuthState({ user: null, isUserLoading: true, userError: null }); // Reset on auth instance change
 
+    let timeoutId: NodeJS.Timeout;
+
     const unsubscribe = onAuthStateChanged(
       auth,
       (firebaseUser) => { // Auth state determined
+        clearTimeout(timeoutId);
         setUserAuthState({ user: firebaseUser, isUserLoading: false, userError: null });
       },
       (error) => { // Auth listener error
+        clearTimeout(timeoutId);
         console.error("FirebaseProvider: onAuthStateChanged error:", error);
         setUserAuthState({ user: null, isUserLoading: false, userError: error });
       }
     );
-    return () => unsubscribe(); // Cleanup
+
+    // Fallback: if Firebase Auth is blocked or unresponsive, stop loading after 3 seconds
+    timeoutId = setTimeout(() => {
+      setUserAuthState(prev => {
+        if (prev.isUserLoading) {
+          console.warn("FirebaseProvider: onAuthStateChanged timed out. Assuming user is not logged in.");
+          return { ...prev, isUserLoading: false };
+        }
+        return prev;
+      });
+    }, 3000);
+
+    return () => {
+      unsubscribe();
+      clearTimeout(timeoutId);
+    };
   }, [auth]); // Depends on the auth instance
 
   // Memoize the context value
@@ -123,13 +142,13 @@ export const useFirebase = (): FirebaseServicesAndUser => {
   }
 
   if (!context.areServicesAvailable || !context.firebaseApp || !context.firestore || !context.auth) {
-    throw new Error('Firebase core services not available. Check FirebaseProvider props.');
+    console.warn('Firebase core services not available. App is running in degraded mode.');
   }
 
   return {
-    firebaseApp: context.firebaseApp,
-    firestore: context.firestore,
-    auth: context.auth,
+    firebaseApp: context.firebaseApp as FirebaseApp,
+    firestore: context.firestore as Firestore,
+    auth: context.auth as Auth,
     user: context.user,
     isUserLoading: context.isUserLoading,
     userError: context.userError,

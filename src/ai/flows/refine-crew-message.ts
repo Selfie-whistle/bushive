@@ -12,6 +12,7 @@ import { z } from 'genkit';
 
 const RefineCrewMessageInputSchema = z.object({
   rawMessage: z.string().describe('The raw, potentially unprofessional message from the cabin crew.'),
+  targetLanguages: z.array(z.string()).optional().describe('Languages to translate the refined message into.'),
 });
 export type RefineCrewMessageInput = z.infer<typeof RefineCrewMessageInputSchema>;
 
@@ -46,7 +47,12 @@ Always start the message with a polite opening like "Dear Passengers,". Keep the
 Raw message from crew:
 "{{{rawMessage}}}"
 
-Generate the refined message.`,
+{{#if targetLanguages}}
+After generating the English message, please provide exact translations of the refined message into the following languages: {{targetLanguages}}.
+Format the final output by separating each language's message with a double newline. Do NOT include labels like "English:" or "Hindi:" unless necessary for clarity. Just output the messages separated by double newlines.
+{{/if}}
+
+Generate the refined message(s).`,
 });
 
 const refineCrewMessageFlow = ai.defineFlow(

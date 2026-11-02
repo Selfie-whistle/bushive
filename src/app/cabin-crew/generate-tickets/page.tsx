@@ -174,9 +174,19 @@ export default function GenerateTicketsPage() {
 
         const bookingResult = await dataService.bookSeats(
             schedule.id,
-            [{ seatNumber: normalizedSeatNumber, gender: passengerGender }],
+            [{ 
+                seatNumber: normalizedSeatNumber, 
+                gender: passengerGender,
+                passengerName: passengerName,
+                boardingPoint: bookingData.boardingPoint || bus.origin
+            }],
             passengerUserId,
-            createdBooking.id
+            createdBooking.id,
+            {
+                boardingPoint: bookingData.boardingPoint || bus.origin,
+                boardingMain: bus.origin,
+                passengerName: passengerName
+            }
         );
         
         if (!bookingResult.success) {

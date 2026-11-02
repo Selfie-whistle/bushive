@@ -85,6 +85,20 @@ export function ProgressClientPage({ tripId }: { tripId: string }) {
 
   const { liveLocation, isTrackingActive } = useLiveBusData(busId);
 
+  const mapRouteData = useMemo(() => {
+    if (!service) return null;
+    return {
+      forward: {
+        boarding: service.boardingPointsForward || [],
+        dropping: service.droppingPointsForward || [],
+      },
+      return: {
+        boarding: service.boardingPointsReturn || [],
+        dropping: service.droppingPointsReturn || [],
+      },
+    };
+  }, [service]);
+
   useEffect(() => {
     const unsub = dataService.onScheduleSnapshot(tripId, async (s) => {
       if (!s) {
@@ -692,7 +706,7 @@ export function ProgressClientPage({ tripId }: { tripId: string }) {
           </Button>
         </div>
       </div>
-      <div className="hidden">
+      <div className="absolute w-0 h-0 overflow-hidden pointer-events-none opacity-0">
         {bus && schedule && liveLocation && (
           <>
             {nextPoint && (
@@ -704,6 +718,8 @@ export function ProgressClientPage({ tripId }: { tripId: string }) {
                 bookingDate={schedule.date}
                 scheduledTime={nextPoint.time}
                 departureTime={bus.departureTime}
+                mapRouteData={mapRouteData}
+                activeSchedule={schedule}
               />
             )}
             {finalDestinationPoint && (
@@ -715,6 +731,8 @@ export function ProgressClientPage({ tripId }: { tripId: string }) {
                 bookingDate={schedule.date}
                 scheduledTime={finalDestinationPoint.time}
                 departureTime={bus.departureTime}
+                mapRouteData={mapRouteData}
+                activeSchedule={schedule}
               />
             )}
           </>

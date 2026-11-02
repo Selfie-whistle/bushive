@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Frown, Copy, Sparkles, Ticket } from 'lucide-react';
 import { PaymentMethods } from '@/components/payment-methods';
 import ConfettiAnimation from '@/components/confetti-animation';
+import { SlideToPay } from '@/components/ui/slide-to-pay';
 import { dataService } from '@/lib/data/client-service';
 import { useFirebase } from '@/firebase';
 import type { Bus, Point } from '@/lib/types';
@@ -34,6 +35,9 @@ function PaymentPageContent() {
   const [couponGenerated, setCouponGenerated] = useState(false);
   const [generatedCoupon, setGeneratedCoupon] = useState<{ code: string; discount: number; percent: number } | null>(null);
   const [showCouponGenerator, setShowCouponGenerator] = useState(false);
+  const [premiumSub, setPremiumSub] = useState<any>(null);
+  const [premiumDiscount, setPremiumDiscount] = useState(0);
+
 
 
   useEffect(() => {
@@ -46,25 +50,39 @@ function PaymentPageContent() {
         }
     }
   }, []);
-  
+
   const baseFare = useMemo(() => bookingData ? bookingData.totalFare : 0, [bookingData]);
-  
+
   const taxes = useMemo(
     () => bookingData ? baseFare * 0.05 : 0,
     [bookingData, baseFare]
   );
-  
+
   const totalFareBeforeDiscount = useMemo(
     () => baseFare + taxes,
     [baseFare, taxes]
   );
 
+  useEffect(() => {
+    if (user && totalFareBeforeDiscount > 0) {
+      dataService.getPremiumSubscription(user.uid).then(sub => {
+        setPremiumSub(sub);
+        if (sub && sub.status === 'active') {
+          // Premium discount is 20% of total fare
+          const d = totalFareBeforeDiscount * 0.2;
+          setPremiumDiscount(Math.floor(d));
+        }
+      });
+    }
+  }, [user, totalFareBeforeDiscount]);
 
-  const finalAmount = useMemo(() => {
+
+   const finalAmount = useMemo(() => {
     if (!bookingData) return 0;
-    const amount = totalFareBeforeDiscount - discount;
+    const amount = totalFareBeforeDiscount - discount - premiumDiscount;
     return amount > 0 ? amount : 0;
-  }, [totalFareBeforeDiscount, discount, bookingData]);
+  }, [totalFareBeforeDiscount, discount, premiumDiscount, bookingData]);
+
   
   if (!bookingData) {
     return (
@@ -226,12 +244,25 @@ function PaymentPageContent() {
         masterBookingId = createdBooking.id;
 
         const scheduleId = bookingData.scheduleId;
+        const resolvedBoardingPoint = pickupPoint?.name ?? bookingData.boardingPoint ?? '';
         const seatsToBook = bookingData.passengers.map((p: any) => ({
             seatNumber: p.seatNumber,
             gender: p.gender,
+            passengerName: p.name,
+            boardingPoint: resolvedBoardingPoint,
         }));
         
-        const bookingResult = await dataService.bookSeats(scheduleId, seatsToBook, user.uid, masterBookingId);
+        const bookingResult = await dataService.bookSeats(
+            scheduleId, 
+            seatsToBook, 
+            user.uid, 
+            masterBookingId,
+            {
+                boardingPoint: resolvedBoardingPoint,
+                boardingMain: pickupPoint?.main ?? (isReturn ? bus.destination : bus.origin),
+                passengerName: bookingData.passengers?.[0]?.name || ''
+            }
+        );
 
         if (!bookingResult.success) {
             throw new Error(bookingResult.message || 'One or more seats could not be booked.');
@@ -239,8 +270,14 @@ function PaymentPageContent() {
         
         await dataService.updateTicketStatus(user.uid, masterBookingId, 'CONFIRMED');
         
+        // Process Premium Subscription updates if applicable
+        if (premiumDiscount > 0) {
+          await dataService.processPremiumBooking(user.uid, premiumDiscount, masterBookingId, bus.operatorId);
+        }
+
         sessionStorage.removeItem('booking');
         router.push(`/confirmation/${masterBookingId}`);
+
 
     } catch(e: any) {
         console.error("Booking failed:", e);
@@ -339,6 +376,16 @@ function PaymentPageContent() {
                             <span className='font-headline'>- ₹{discount.toFixed(2)}</span>
                         </div>
                     )}
+                    {premiumDiscount > 0 && (
+                        <div className="flex justify-between text-sm text-indigo-600">
+                            <div className="flex items-center gap-1">
+                              <Sparkles className="w-3 h-3" />
+                              <span className='font-headline'>Premium Discount</span>
+                            </div>
+                            <span className='font-headline'>- ₹{premiumDiscount.toFixed(2)}</span>
+                        </div>
+                    )}
+
                     </>
                     )}
                 
@@ -356,9 +403,13 @@ function PaymentPageContent() {
                         {isSubmitting ? 'Confirming...' : 'Confirm Seat Change'}
                     </Button>
                   ) : (
-                    <Button type="submit" className="w-full font-headline" disabled={isSubmitting || !selectedPaymentMethod} onClick={handlePayment}>
-                        {isSubmitting ? 'Processing...' : `Pay ₹${finalAmount.toFixed(2)}`}
-                    </Button>
+                    <div className="w-full flex justify-center mt-2">
+                        <SlideToPay 
+                            disabled={isSubmitting || !selectedPaymentMethod}
+                            onSuccess={handlePayment}
+                            text={`Slide to Pay ₹${finalAmount.toFixed(2)}`}
+                        />
+                    </div>
                   )}
                 </CardFooter>
               </Card>

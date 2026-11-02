@@ -30,7 +30,8 @@ import { useToast } from '@/hooks/use-toast';
 import { FirebaseError } from 'firebase/app';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Bus, Sparkles } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { dataService } from '@/lib/data/client-service';
 
 const userLoginSchema = z.object({
@@ -246,79 +247,115 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="container flex min-h-[calc(100vh-10rem)] items-center justify-center py-12">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>Welcome Back</CardTitle>
-          <CardDescription>Sign in to your BusHive account.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...userForm}>
-            <form onSubmit={userForm.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField control={userForm.control} name="emailOrPhone" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email or Phone</FormLabel>
-                    <FormControl><Input placeholder="you@example.com or 9876543210" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField control={userForm.control} name="password" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl>
-                        <div className="relative">
-                            <Input placeholder="••••••••" type={showPassword ? 'text' : 'password'} {...field} />
-                             <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5">
-                                {showPassword ? <EyeOff className="h-5 w-5 text-gray-500" /> : <Eye className="h-5 w-5 text-gray-500" />}
-                            </button>
-                        </div>
-                    </FormControl>
-                    <div className="text-right pt-1"><Link href="/reset-password" className="text-sm font-medium text-link underline-offset-4 hover:underline">Forgot password?</Link></div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button type="submit" disabled={isLoading} className="w-full">{isLoading ? 'Logging in...' : 'Login'}</Button>
-              <div className="text-center text-sm text-muted-foreground">
-                Don't have an account?{' '}
-                <Link href="/signup" className="font-bold text-link underline">Sign up here</Link>
-              </div>
-            </form>
-          </Form>
-        </CardContent>
-        <div className="p-6 pt-0 text-xs text-right text-muted-foreground">
-            <Dialog>
-                <DialogTrigger asChild>
-                    <Button variant="link" className="p-0 h-auto">Admin Login</Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                        <DialogTitle>Admin Login</DialogTitle>
-                        <DialogDescription>Access the administration panel.</DialogDescription>
-                    </DialogHeader>
-                    <div className="py-4">
-                        <RoleLoginForm role="Admin" />
-                    </div>
-                </DialogContent>
-            </Dialog>
-             <span className="mx-1">/</span>
-             <Dialog>
-                <DialogTrigger asChild>
-                    <Button variant="link" className="p-0 h-auto">Cabin Crew Login</Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                        <DialogTitle>Cabin Crew Login</DialogTitle>
-                        <DialogDescription>Access the trip management console.</DialogDescription>
-                    </DialogHeader>
-                    <div className="py-4">
-                        <RoleLoginForm role="Cabin Crew" />
-                    </div>
-                </DialogContent>
-            </Dialog>
-        </div>
-      </Card>
+    <div className="relative min-h-[calc(100vh-4rem)] flex items-center justify-center py-12 px-4 overflow-hidden">
+      {/* Animated Background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-red-50 via-white to-rose-50 -z-20" />
+      <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-60 mix-blend-multiply z-0">
+          <motion.div 
+              animate={{ rotate: 360, scale: [1, 1.2, 1], x: [0, 40, -20, 0], y: [0, 30, -30, 0] }} 
+              transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+              className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-red-200/50 blur-[100px]"
+          />
+          <motion.div 
+              animate={{ rotate: -360, scale: [1, 1.3, 1], x: [0, -30, 40, 0], y: [0, -40, 50, 0] }} 
+              transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
+              className="absolute bottom-[-10%] right-[-10%] w-[45vw] h-[45vw] rounded-full bg-rose-200/40 blur-[100px]"
+          />
+      </div>
+
+      <motion.div 
+        initial={{ opacity: 0, y: 30, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+        className="w-full max-w-md relative z-10"
+      >
+        <Card className="w-full bg-white/80 backdrop-blur-xl border border-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-3xl overflow-hidden ring-1 ring-black/5">
+          <CardHeader className="text-center pb-2 pt-8">
+            <motion.div 
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", delay: 0.2, duration: 0.6 }}
+                className="w-16 h-16 bg-gradient-to-tr from-red-600 to-rose-500 rounded-2xl mx-auto flex items-center justify-center mb-4 shadow-lg text-white"
+            >
+                <Bus className="w-8 h-8" />
+            </motion.div>
+            <CardTitle className="text-3xl font-black text-gray-900 tracking-tight">Welcome Back</CardTitle>
+            <CardDescription className="text-base text-gray-500 font-medium mt-2">Sign in to your BusHive account.</CardDescription>
+          </CardHeader>
+          <CardContent className="px-6 md:px-8 pb-8 pt-4">
+            <Form {...userForm}>
+              <form onSubmit={userForm.handleSubmit(onSubmit)} className="space-y-5">
+                <FormField control={userForm.control} name="emailOrPhone" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="font-bold text-gray-700">Email or Phone</FormLabel>
+                      <FormControl>
+                          <Input className="h-12 bg-white/50 border-gray-200 focus-visible:ring-red-500 focus-visible:border-red-500 rounded-xl" placeholder="you@example.com or 9876543210" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField control={userForm.control} name="password" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="font-bold text-gray-700">Password</FormLabel>
+                      <FormControl>
+                          <div className="relative">
+                              <Input className="h-12 bg-white/50 border-gray-200 focus-visible:ring-red-500 focus-visible:border-red-500 rounded-xl pr-10" placeholder="••••••••" type={showPassword ? 'text' : 'password'} {...field} />
+                               <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5">
+                                  {showPassword ? <EyeOff className="h-5 w-5 text-gray-400 hover:text-red-600 transition-colors" /> : <Eye className="h-5 w-5 text-gray-400 hover:text-red-600 transition-colors" />}
+                              </button>
+                          </div>
+                      </FormControl>
+                      <div className="text-right pt-1"><Link href="/reset-password" className="text-sm font-semibold text-red-600 hover:text-red-800 transition-colors">Forgot password?</Link></div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" disabled={isLoading} className="w-full h-12 text-base font-bold bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 shadow-md rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]">
+                    {isLoading ? 'Logging in...' : 'Login'}
+                </Button>
+                <div className="text-center text-sm font-medium text-gray-500 mt-6">
+                  Don't have an account?{' '}
+                  <Link href="/signup" className="font-black text-red-600 hover:text-red-800 transition-colors">Sign up here</Link>
+                </div>
+              </form>
+            </Form>
+          </CardContent>
+          <div className="bg-gray-50/50 p-4 border-t border-gray-100 flex flex-wrap justify-center items-center gap-2 text-xs font-semibold text-gray-400">
+              <Dialog>
+                  <DialogTrigger asChild>
+                      <button className="hover:text-red-600 transition-colors">Admin Login</button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                          <DialogTitle>Admin Login</DialogTitle>
+                          <DialogDescription>Access the administration panel.</DialogDescription>
+                      </DialogHeader>
+                      <div className="py-4">
+                          <RoleLoginForm role="Admin" />
+                      </div>
+                  </DialogContent>
+              </Dialog>
+               <span className="opacity-50">•</span>
+               <Link href="/register/admin" className="hover:text-red-600 transition-colors">Create Admin</Link>
+               <span className="opacity-50">•</span>
+               <Dialog>
+                  <DialogTrigger asChild>
+                      <button className="hover:text-red-600 transition-colors">Cabin Crew Login</button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                          <DialogTitle>Cabin Crew Login</DialogTitle>
+                          <DialogDescription>Access the trip management console.</DialogDescription>
+                      </DialogHeader>
+                      <div className="py-4">
+                          <RoleLoginForm role="Cabin Crew" />
+                      </div>
+                  </DialogContent>
+              </Dialog>
+          </div>
+        </Card>
+      </motion.div>
     </div>
   );
 }

@@ -5,6 +5,7 @@ type SecurityRuleContext = {
   path: string;
   operation: 'get' | 'list' | 'create' | 'update' | 'delete' | 'write';
   requestResourceData?: any;
+  query?: any;
 };
 
 interface FirebaseAuthToken {
@@ -32,6 +33,7 @@ interface SecurityRuleRequest {
   resource?: {
     data: any;
   };
+  query?: any;
 }
 
 /**
@@ -93,6 +95,7 @@ function buildRequestObject(context: SecurityRuleContext): SecurityRuleRequest {
     method: context.operation,
     path: `/databases/(default)/documents/${context.path}`,
     resource: context.requestResourceData ? { data: context.requestResourceData } : undefined,
+    query: context.query,
   };
 }
 

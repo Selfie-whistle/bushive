@@ -16,13 +16,16 @@ export function TicketCard({
   schedule,
   service,
   fromAdmin,
+  mealBenefit,
 }: {
   booking: Booking;
   bus: BusType;
   schedule: Schedule;
   service: Service;
   fromAdmin?: boolean;
+  mealBenefit?: { tripId: string; code: string; isServed: boolean; servedAt?: string };
 }) {
+
   const router = useRouter();
 
   const {
@@ -89,10 +92,10 @@ export function TicketCard({
         ? getScheduledDateTime(
             parsedBookingDate,
             fullDroppingPoint.time,
-            bus.departureTime
+            fullBoardingPoint?.time || bus.departureTime
           )
         : null,
-    [fullDroppingPoint?.time, parsedBookingDate, bus.departureTime]
+    [fullDroppingPoint?.time, parsedBookingDate, bus.departureTime, fullBoardingPoint?.time]
   );
 
   const formatTime = (date: Date | null): string => {
@@ -128,7 +131,15 @@ export function TicketCard({
   };
 
   const handleTrackBus = () => {
-    router.push(`/track/${id}${fromAdmin ? '?from=admin' : ''}`);
+    const passengerSeat = booking.passengers?.[0]?.seatNumber;
+    const isBoarded = schedule?.bookings?.some(
+      (b: any) => b.bookingId === id && (!passengerSeat || b.seat === passengerSeat) && b.boarded
+    );
+    if (isBoarded) {
+      router.push(`/track/${id}/console${fromAdmin ? '?from=admin' : ''}`);
+    } else {
+      router.push(`/track/${id}${fromAdmin ? '?from=admin' : ''}`);
+    }
   };
 
   const isSleeper = bus.busType?.toLowerCase().includes('sleeper') || bus.busCategory?.toLowerCase().includes('sleeper');
@@ -305,6 +316,45 @@ export function TicketCard({
             ))}
           </div>
         </div>
+
+        {mealBenefit && (
+          <div className="p-6 border-b border-blue-100 bg-amber-50/50">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-orange-100 to-yellow-100">
+                <div className="text-xl">🍱</div>
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-orange-800">PREMIUM MEAL BENEFIT</h3>
+                <p className="text-orange-600 text-sm">A special treat for our premium member! 🎁</p>
+              </div>
+            </div>
+            
+            <div className="bg-white p-6 rounded-2xl border-2 border-dashed border-orange-200 relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-2">
+                {mealBenefit.isServed ? (
+                  <div className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    Already Served
+                  </div>
+                ) : (
+                  <div className="bg-orange-100 text-orange-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    Ready to Serve
+                  </div>
+                )}
+              </div>
+
+              <div className="text-center space-y-2">
+                <p className="text-xs text-gray-500 uppercase tracking-widest font-bold">Meal Verification Code</p>
+                <p className="text-4xl font-black text-orange-600 font-mono tracking-[0.2em]">
+                  {mealBenefit.code}
+                </p>
+                <p className="text-[10px] text-gray-400 max-w-[200px] mx-auto italic">
+                  Show this code to the cabin crew during your journey to claim your free meal.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
 
         <div className="p-6">
           <div className="flex items-center gap-3 mb-6">

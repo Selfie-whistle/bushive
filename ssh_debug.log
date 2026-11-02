@@ -1,0 +1,19 @@
+OpenSSH_for_Windows_9.5p2, LibreSSL 3.8.2
+debug3: Failed to open file:C:/Users/nibid/.ssh/config error:2
+debug3: Failed to open file:C:/ProgramData/ssh/ssh_config error:2
+Pseudo-terminal will not be allocated because stdin is not a terminal.
+debug3: expanded UserKnownHostsFile '~/.ssh/known_hosts' -> 'C:\\Users\\nibid/.ssh/known_hosts'
+debug3: expanded UserKnownHostsFile '~/.ssh/known_hosts2' -> 'C:\\Users\\nibid/.ssh/known_hosts2'
+debug2: resolving "localhost.run" port 22
+debug3: resolve_host: lookup localhost.run:22
+debug3: ssh_connect_direct: entering
+debug1: Connecting to localhost.run [35.171.254.69] port 22.
+debug3: finish_connect - ERROR: async io completed with error: 10060, io:000001F85AC0E170
+debug1: connect to address 35.171.254.69 port 22: Connection timed out
+debug1: Connecting to localhost.run [54.161.197.247] port 22.
+debug3: finish_connect - ERROR: async io completed with error: 10060, io:000001F85AC0E170
+debug1: connect to address 54.161.197.247 port 22: Connection timed out
+debug1: Connecting to localhost.run [54.82.85.249] port 22.
+debug3: finish_connect - ERROR: async io completed with error: 10060, io:000001F85AC0E170
+debug1: connect to address 54.82.85.249 port 22: Connection timed out
+ssh: connect to host localhost.run port 22: Connection timed out

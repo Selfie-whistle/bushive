@@ -84,6 +84,8 @@ export function IndianSleeper36Layout({
                 // NORMAL MODE LOGIC
                 if (showBoardedStatus && booking.boarded) {
                     seat.status = 'boarded';
+                } else if (booking.blocked || booking.gender === 'other' || !booking.gender) {
+                    seat.status = 'sold';
                 } else {
                     seat.status =
                         booking.gender === "male" ? "male-booked" : "female-booked";
@@ -111,7 +113,7 @@ export function IndianSleeper36Layout({
 
         if (onSeatSelection) { // For booking page
             const currentStatus = getSeatStatus(seatId);
-            if (currentStatus.includes('booked') || currentStatus === 'boarded' || currentStatus === 'reboarded') return;
+            if (currentStatus.includes('booked') || currentStatus === 'boarded' || currentStatus === 'reboarded' || currentStatus === 'sold') return;
 
             const isAlreadySelected = preSelectedSeats.includes(seatId);
             const updatedSelected = isAlreadySelected
@@ -230,6 +232,16 @@ export function IndianSleeper36Layout({
                     isRestStopManifest={isRestStopManifest}
                 />
                 <span>Booked (Male)</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                <SeatBox
+                    seat={{ id: '', number: '', row: 0, col: 0, status: 'sold', price: 0 }}
+                    isLegend
+                    showPrice={showPrice}
+                    isRestStopManifest={isRestStopManifest}
+                />
+                <span>Blocked</span>
                 </div>
                 
                 <div className="flex items-center gap-2">
@@ -400,7 +412,7 @@ function SeatBox({ seat, isLegend, onSeatClick, status, reservedFor, showPrice, 
       currentStatus = reservedFor;
     }
     
-    const isBooked = currentStatus.includes('booked') || currentStatus === 'reboarded';
+    const isBooked = currentStatus.includes('booked') || currentStatus === 'reboarded' || currentStatus === 'sold';
     const isBoarded = currentStatus === 'boarded';
     const isInteractive = !!onSeatClick && !isLegend;
     const canClick = isInteractive && (isRestStopManifest ? (currentStatus === 'male' || currentStatus === 'female' || currentStatus === 'reboarded') : !isBooked);
@@ -419,6 +431,7 @@ function SeatBox({ seat, isLegend, onSeatClick, status, reservedFor, showPrice, 
         
         currentStatus === "male-booked" && "bg-gray-200 border-blue-500 text-gray-500",
         currentStatus === "female-booked" && "bg-gray-200 border-pink-500 text-gray-500",
+        currentStatus === "sold" && "bg-gray-200 border-gray-400 text-gray-500",
         currentStatus === "boarded" && (seat.gender === 'male' ? 'bg-blue-600 border-blue-700 text-white' : seat.gender === 'female' ? 'bg-pink-600 border-pink-700 text-white' : 'bg-green-600 border-green-700 text-white'),
         currentStatus === "reboarded" && "bg-violet-400 border-violet-500 text-white", // Dim Light Violet for re-boarded
 
@@ -431,7 +444,8 @@ function SeatBox({ seat, isLegend, onSeatClick, status, reservedFor, showPrice, 
         className={cn(
           "absolute right-[3px] top-1/2 -translate-y-1/2 w-[4px] h-[70%] rounded-full",
           (currentStatus === 'male-booked' || currentStatus === 'female-booked' || currentStatus === 'boarded' || currentStatus === 'reboarded' || currentStatus === 'male' || currentStatus === 'female') && "bg-white/80",
-          (currentStatus === 'available' || currentStatus === 'selected') && 'bg-gray-400'
+          (currentStatus === 'available' || currentStatus === 'selected') && 'bg-gray-400',
+          currentStatus === 'sold' && 'bg-gray-400'
         )}
       />
       {/* SHOW RATE INSTEAD OF SOLD FOR GENDER RESERVED SEATS */}

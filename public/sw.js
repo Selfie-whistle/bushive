@@ -1,24 +1,13 @@
+self.addEventListener('install', () => {
+  self.skipWaiting();
+});
 
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  
-  const urlToOpen = event.notification.data.url || '/';
-
+self.addEventListener('activate', (event) => {
   event.waitUntil(
-    clients.matchAll({
-      type: 'window',
-      includeUncontrolled: true,
-    }).then((clientList) => {
-      if (clientList.length > 0) {
-        let client = clientList[0];
-        for (let i = 0; i < clientList.length; i++) {
-          if (clientList[i].focused) {
-            client = clientList[i];
-          }
-        }
-        return client.focus();
-      }
-      return clients.openWindow(urlToOpen);
+    caches.keys().then((keys) => {
+      return Promise.all(keys.map((key) => caches.delete(key)));
+    }).then(() => {
+      return self.registration.unregister();
     })
   );
 });

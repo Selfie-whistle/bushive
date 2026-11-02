@@ -219,6 +219,7 @@ const busFormSchema = z.object({
   busModel: z.string().optional(),
   cabinCrewId: z.string().optional(),
   serviceId: z.string().optional(),
+  amenities: z.string().optional(),
 });
 
 type BusFormValues = z.infer<typeof busFormSchema>;
@@ -265,6 +266,7 @@ function BusFormDialog({
           busModel: bus.busModel || '',
           cabinCrewId: bus.cabinCrewId || '',
           serviceId: bus.serviceId || '',
+          amenities: bus.amenities?.join(', ') || '',
         });
         setBusImages(bus.images || []);
         setOperatorImages(bus.operatorImages || []);
@@ -277,6 +279,7 @@ function BusFormDialog({
           busModel: 'BharatBenz Glider',
           cabinCrewId: '',
           serviceId: '',
+          amenities: 'A/C, Live Tracking, Water Bottle, Charging Point',
         });
         setBusImages([]);
         setOperatorImages([]);
@@ -294,6 +297,7 @@ function BusFormDialog({
       busModel: values.busModel,
       cabinCrewId: values.cabinCrewId,
       serviceId: values.serviceId,
+      amenities: values.amenities ? values.amenities.split(',').map(s => s.trim()).filter(Boolean) : [],
       images: busImages,
       operatorImages: operatorImages,
       id: bus?.id && !oppositeBus ? bus.id : values.busNumber.replace(/\s+/g, ''),
@@ -308,7 +312,6 @@ function BusFormDialog({
       newBusData.totalSeats = 36;
       newBusData.baseFare = 1500;
       newBusData.rating = 4.5;
-      newBusData.amenities = ['A/C', 'Live Tracking', 'Water Bottle', 'Charging Point'];
       newBusData.busCategory = 'Sleeper';
       if(bus) {
         newBusData.serviceId = bus.serviceId;
@@ -433,6 +436,19 @@ function BusFormDialog({
                           <FormLabel>Service ID (Route ID)</FormLabel>
                           <FormControl>
                             <Input {...field} placeholder="e.g. punalur-bangalore" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="amenities"
+                      render={({ field }) => (
+                        <FormItem className="col-span-2">
+                          <FormLabel>Amenities (Comma separated)</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="e.g. A/C, WiFi, Water Bottle" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

@@ -1,0 +1,3 @@
+[?9001h[?1004h[?25l[2J[m[HWindows PowerShell 5.1
+Copyright (C) Microsoft Corporation. All rights reserved.[4;1HInstall the latest PowerShell for new features and improvements! https://aka.ms/PSWindows]0;C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe[?25h[?25l[7;1H[?25hPS C:\Users\nibid\Downloads\Bushive> [?25l[93ms[?25h[m[93mssh [90m-p [97m443 [90m-R0:[37mlocalhost:3000 [90m-o [37mStrictHostKeyChecking=accept-new a.pingg[?25l[m[93m[7;38Hssh [90m-p [97m443 [90m-R0:[37mlocalhost:3000 [90m-o [37mStrictHostKeyChecking=accept-new a.pinggy.io
+[?25h[mnibid@a.pinggy.io's password: 
